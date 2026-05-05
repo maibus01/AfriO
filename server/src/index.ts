@@ -25,8 +25,11 @@ const app: Application = express();
 // Middleware
 app.use(
   cors({
-    // Mun kara link din Vercel a nan don ya ba shi izini
-    origin: [ "https://afrio.vercel.app"], 
+    origin: [
+      "http://localhost:5173", 
+      "https://afrio.vercel.app",
+      "https://afrio-qfwqx5hyx-mahmuds-projects-5b377daa.vercel.app"
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
