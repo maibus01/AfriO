@@ -26,7 +26,7 @@ const app: Application = express();
 app.use(
   cors({
     // Mun kara link din Vercel a nan don ya ba shi izini
-    origin: ["http://localhost:5173", "https://afrio.vercel.app"], 
+    origin: [ "https://afrio.vercel.app"], 
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
