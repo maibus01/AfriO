@@ -4,7 +4,7 @@ import { ShoppingBag, Sparkles, ArrowLeft, Share2, Info } from "lucide-react";
 import axios from "axios";
 import PublicBusinessHero from "../components/PublicBusinessHero";
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 export default function PublicSeller() {
   const { businessId } = useParams();

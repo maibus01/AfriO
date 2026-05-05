@@ -5,7 +5,7 @@ import {
   ShoppingBag, Verified, ExternalLink, Plus, Minus,
 } from "lucide-react";
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 export default function ProductDetails() {
   const { id } = useParams();

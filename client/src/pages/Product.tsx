@@ -7,7 +7,7 @@ import {
 import BusinessHero from "../components/BusinessHero";
 import SellerOrderManager from "./SellersOrder"; // Your new Order file
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 type Product = {
   _id: string;

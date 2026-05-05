@@ -5,7 +5,7 @@ import MeasurementManager from "../pages/Measurement";
 import Request from "./Request";
 import MyOrders from "./MyOders";
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 // =====================
 // TYPES

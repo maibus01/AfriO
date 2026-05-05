@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { MessageCircle, Share2, UserPlus, Users, Camera, Check } from "lucide-react";
 import axios from "axios";
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 export default function BusinessHero({ business }: any) {
   const token = localStorage.getItem("token");

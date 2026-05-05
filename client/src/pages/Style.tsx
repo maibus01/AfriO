@@ -4,7 +4,7 @@ import { Plus, Trash2, Edit3, Search, LayoutGrid, ClipboardList, X } from "lucid
 import BusinessHero from "../components/BusinessHero";
 import TailorRequestManager from "./TailorRequested"; // This is the file we made earlier
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 type Style = {
   _id: string;

@@ -3,7 +3,7 @@ import axios from "axios";
 import { Package, Scissors } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 export default function BusinessDashboard() {
   const { id } = useParams();
