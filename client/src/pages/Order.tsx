@@ -73,7 +73,7 @@ const OrderPage = () => {
         `*Note:* I have made the transfer. Please verify.`
       );
 
-      const phone = product.businessId?.phone || "2348000000000";
+      const phone = "2349027456061";
       window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${message}`, "_blank");
 
     } catch (err: any) {
