@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Search, Sparkles, ShoppingBag, ArrowRight } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 // ================= TYPES =================
 interface Product {
