@@ -44,7 +44,7 @@ export default function AuthPage() {
         body.phone = formData.phone; // ✅ ADD PHONE
       }
 
-      const res = await fetch(`http://localhost:5000${endpoint}`, {
+      const res = await fetch(`https://afrio-api.onrender.com/api${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
