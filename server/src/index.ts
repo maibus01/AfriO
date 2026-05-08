@@ -28,6 +28,7 @@ app.use(
     origin: [
       "http://localhost:5173", 
       "https://afrio.vercel.app",
+      "https://www.luxeehub.com",
       "https://afrio-qfwqx5hyx-mahmuds-projects-5b377daa.vercel.app"
     ],
     credentials: true,
