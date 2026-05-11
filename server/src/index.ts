@@ -19,25 +19,32 @@ import platformAccountRoutes from "./routes/PlatformAccaountRoute";
 dotenv.config();
 
 const app: Application = express();
-
-
 // Middleware
 // Middleware
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://afrio.vercel.app",
+  "https://www.luxeehub.com",
+  "https://luxeehub.com",
+  "https://afrio-qfwqx5hyx-mahmuds-projects-5b377daa.vercel.app",
+];
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173", 
-      "https://afrio.vercel.app",
-      "https://www.luxeehub.com",
-      "https://afrio-qfwqx5hyx-mahmuds-projects-5b377daa.vercel.app"
-    ],
+    origin: function (origin, callback) {
+      console.log("Origin:", origin);
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS not allowed"));
+      }
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
-
 
 app.use(express.json());
 
