@@ -6,16 +6,16 @@ const ButtonBar = () => {
   const location = useLocation();
 
   const navItems = [
-    { name: "Home", path: "/", icon: <Home size={18} /> },
-    { name: "Shop", path: "/shop", icon: <ShoppingBag size={18} /> },
-    { name: "Bulk", path: "/bulk", icon: <Box size={18} /> },
-    { name: "Services", path: "/services", icon: <Settings size={18} /> },
-    { name: "Orders", path: "/orders", icon: <ClipboardList size={18} /> },
+    { name: "Home", path: "/", icon: <Home size={22} /> },
+    { name: "Shop", path: "/shop", icon: <ShoppingBag size={22} /> },
+    { name: "Bulk", path: "/bulk", icon: <Box size={22} /> },
+    { name: "Services", path: "/services", icon: <Settings size={22} /> },
+    { name: "Orders", path: "/orders", icon: <ClipboardList size={22} /> },
   ];
 
   return (
-    <div className="w-full bg-white dark:bg-gray-950 border-b border-slate-100 dark:border-gray-900 overflow-x-auto no-scrollbar">
-      <div className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-2 md:gap-8 h-12">
+    <div className="fixed bottom-0 left-0 right-0 z-[100] bg-white dark:bg-gray-950 border-t border-slate-200 dark:border-gray-800 pb-safe">
+      <div className="flex items-center justify-around h-16">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           
@@ -23,16 +23,25 @@ const ButtonBar = () => {
             <button
               key={item.name}
               onClick={() => navigate(item.path)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all text-sm font-medium whitespace-nowrap
-                ${isActive 
-                  ? "bg-orange-50 text-orange-600 dark:bg-orange-950/30" 
-                  : "text-slate-600 dark:text-gray-400 hover:text-orange-600 hover:bg-slate-50 dark:hover:bg-gray-900"
-                }`}
+              className="flex flex-col items-center justify-center flex-1 transition-all relative"
             >
-              <span className={isActive ? "text-orange-600" : "text-slate-400"}>
-                {item.icon}
+              {/* WhatsApp-style pill highlight for active tab */}
+              <div className={`flex flex-col items-center px-5 py-1 rounded-full transition-all ${
+                isActive ? "bg-orange-100 dark:bg-orange-900/40" : ""
+              }`}>
+                <span className={`${
+                  isActive ? "text-orange-600 dark:text-orange-500" : "text-slate-500 dark:text-gray-400"
+                }`}>
+                  {item.icon}
+                </span>
+              </div>
+              
+              {/* Text Label */}
+              <span className={`text-[10px] mt-1 font-medium ${
+                isActive ? "text-slate-900 dark:text-white" : "text-slate-500 dark:text-gray-500"
+              }`}>
+                {item.name}
               </span>
-              {item.name}
             </button>
           );
         })}
