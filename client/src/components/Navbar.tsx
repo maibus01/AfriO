@@ -30,7 +30,7 @@ const Navbar = () => {
         
         {/* BRAND LOGO */}
         <Link to="/" className="text-xl md:text-2xl font-black tracking-tighter text-slate-900 dark:text-white flex items-center gap-1">
-          <span className="text-orange-600">Afri</span>O
+          <span className="text-orange-600">Luxee</span>Hub
           <div className="w-1.5 h-1.5 rounded-full bg-orange-600 mt-2"></div>
         </Link>
 
