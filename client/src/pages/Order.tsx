@@ -102,7 +102,7 @@ const OrderPage = () => {
   }
 
   return (
-    <div className="bg-[#fafafa] min-h-screen pb-32">
+    <div className="bg-[#fafafa] min-h-screen pb-24">
       {/* HEADER */}
       <div className="p-6 flex items-center gap-4 bg-white border-b sticky top-0 z-10">
         <button onClick={() => navigate(-1)}><ArrowLeft size={22} /></button>
@@ -192,7 +192,7 @@ const OrderPage = () => {
       </div>
 
       {/* FIXED FOOTER BUTTON */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 pb-24 bg-white/80 backdrop-blur-md border-t border-slate-100">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100">
         <button
           onClick={handleCompleteOrder}
           disabled={processingOrder || !selectedAccount}
