@@ -98,7 +98,7 @@ export default function StyleDetails() {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <div className="font-black text-4xl text-orange-500 animate-bounce">AFRIO</div>
+        <div className="font-black text-4xl text-orange-500 animate-bounce">LUXEE</div>
       </div>
     );
   }
