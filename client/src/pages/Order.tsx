@@ -102,7 +102,7 @@ const OrderPage = () => {
   }
 
   return (
-    <div className="bg-[#fafafa] min-h-screen pb-2">
+    <div className="bg-[#fafafa] min-h-screen pb-32">
       {/* HEADER */}
       <div className="p-6 flex items-center gap-4 bg-white border-b sticky top-0 z-10">
         <button onClick={() => navigate(-1)}><ArrowLeft size={22} /></button>
