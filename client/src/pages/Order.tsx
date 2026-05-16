@@ -64,7 +64,7 @@ const OrderPage = () => {
 
       // Format WhatsApp Message
       const message = encodeURIComponent(
-        `💎 *AFRIO ORDER RECEIPT*\n\n` +
+        `💎 *LUXEE ORDER RECEIPT*\n\n` +
         `*Order ID:* ${orderId.slice(-6).toUpperCase()}\n` +
         `*Product:* ${product.name}\n` +
         `*Quantity:* ${quantity}\n` +
@@ -102,7 +102,7 @@ const OrderPage = () => {
   }
 
   return (
-    <div className="bg-[#fafafa] min-h-screen pb-24">
+    <div className="bg-[#fafafa] min-h-screen pb-2">
       {/* HEADER */}
       <div className="p-6 flex items-center gap-4 bg-white border-b sticky top-0 z-10">
         <button onClick={() => navigate(-1)}><ArrowLeft size={22} /></button>
