@@ -192,7 +192,7 @@ const OrderPage = () => {
       </div>
 
       {/* FIXED FOOTER BUTTON */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100">
+      <div className="fixed bottom-0 left-0 right-0 p-4 pb-24 bg-white/80 backdrop-blur-md border-t border-slate-100">
         <button
           onClick={handleCompleteOrder}
           disabled={processingOrder || !selectedAccount}
