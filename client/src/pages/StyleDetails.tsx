@@ -203,7 +203,6 @@ export default function StyleDetails() {
 
               <button
                 onClick={handleSendRequest}
-                disabled={sending || !selectedM}
                 className="w-full bg-slate-900 text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-3 hover:bg-orange-600 transition-all shadow-xl disabled:bg-slate-200"
               >
                 {sending ? "Processing..." : "Send Request to Tailor"}
