@@ -70,10 +70,7 @@ export default function StyleDetails() {
   const handleSendRequest = async () => {
     if (sending) return;
 
-    if (!selectedM) {
-      alert("Please select a measurement");
-      return;
-    }
+    
 
     try {
       setSending(true);
