@@ -49,7 +49,7 @@ function App() {
             element={<BusinessDashboard />}
           />
 
-<Route path="/order-hub" element={<OrderHub />} />
+<Route path="/orders-hub" element={<OrderHub />} />
           <Route path="/chat" element={<ChatPage />} />
 
 
