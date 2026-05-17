@@ -21,6 +21,7 @@ import AdminOrders from "./pages/AdminOrders";
 import AdminRequests from "./pages/AdminStyleRequest";
 import RequestPaymentPage from "./pages/RequestPaymentPage";
 
+import OrderHub from "./pages/OrderHub";
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
             element={<BusinessDashboard />}
           />
 
+<Route path="/order-hub" element={<OrderHub />} />
           <Route path="/chat" element={<ChatPage />} />
 
 
