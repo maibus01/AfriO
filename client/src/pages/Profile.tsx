@@ -216,9 +216,7 @@ export default function Profile() {
 
       {/* 🔥 MEASUREMENT MANAGER (ONLY SOURCE OF TRUTH) */}
       <MeasurementManager />
-      <Request />
-      <MyOrders />
-
+    
       {/* CLOSET */}
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
         <div className="flex justify-between items-center">
