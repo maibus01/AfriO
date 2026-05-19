@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, Sparkles, ShoppingBag, ArrowRight, Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import ButtonBar from "./components/ButtonBar";
+import ButtonBar from "../components/ButtonBar";
 
 const API = "https://afrio-api.onrender.com/api";
 
