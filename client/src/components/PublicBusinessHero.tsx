@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquare, CheckCircle, Share2, Users } from "lucide-react";
+import { CheckCircle, Share2, Users } from "lucide-react";
 
 type Props = {
   business: any;
@@ -7,7 +7,6 @@ type Props = {
 
 export default function PublicBusinessHero({ business }: Props) {
   const [followed, setFollowed] = useState(false);
- 
 
   // Handle sharing the public link
   const handleShare = () => {
@@ -19,7 +18,7 @@ export default function PublicBusinessHero({ business }: Props) {
 
   return (
     <div className="bg-white border-b border-slate-100">
-      
+
       {/* ================= COVER ================= */}
       <div className="relative h-48 md:h-72 w-full">
         <img
@@ -29,7 +28,7 @@ export default function PublicBusinessHero({ business }: Props) {
         />
         {/* Soft Gradient for depth */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:hidden" />
-        
+
         <button 
           onClick={handleShare}
           className="absolute top-4 right-4 p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-slate-900 transition-all"
@@ -41,16 +40,17 @@ export default function PublicBusinessHero({ business }: Props) {
       {/* ================= PROFILE SECTION ================= */}
       <div className="max-w-6xl mx-auto px-4 md:px-8">
         <div className="relative flex flex-col md:flex-row md:items-end md:justify-between pb-6">
-          
+
           {/* LEFT SIDE: Identity */}
           <div className="flex flex-col md:flex-row items-start md:items-end gap-4 md:gap-6">
-            
+
             {/* LOGO: Overlapping the cover */}
             <div className="relative -mt-12 md:-mt-16">
               <div className="w-24 h-24 md:w-36 md:h-36 rounded-3xl border-4 border-white shadow-xl overflow-hidden bg-slate-50">
                 <img
                   src={business.logo || `https://ui-avatars.com/api/?name=${business.name}&background=random`}
                   className="w-full h-full object-cover"
+                  alt={business.name}
                 />
               </div>
             </div>
@@ -82,48 +82,27 @@ export default function PublicBusinessHero({ business }: Props) {
             </div>
           </div>
 
-          {/* RIGHT SIDE: Actions */}
-         {/* RIGHT SIDE: Actions */}
-<div className="mt-6 md:mt-0 flex items-center gap-2 w-full md:w-auto">
-  
-  {/* WHATSAPP MESSAGE BUTTON */}
-  <button
-    onClick={() => {
-      if (!business?.phone) {
-        return alert("This business hasn't provided a phone number yet.");
-      }
-      
-      // Clean the phone number (remove +, spaces, or dashes)
-      const cleanPhone = business.phone.replace(/\D/g, "");
-      const message = encodeURIComponent(`Hello! I'm interested in your business "${business.name}" on the app.`);
-      
-      window.open(`https://wa.me/${cleanPhone}?text=${message}`, "_blank");
-    }}
-    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-[#25D366] text-white rounded-2xl font-bold hover:bg-[#20bd5a] transition-transform active:scale-95 shadow-lg shadow-green-100"
-  >
-    <MessageSquare size={18} />
-    Message on WhatsApp
-  </button>
-
-  {/* FOLLOW BUTTON */}
-  <button
-    onClick={() => setFollowed(!followed)}
-    className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all border ${
-      followed
-        ? "bg-white border-slate-200 text-slate-500"
-        : "bg-white border-orange-500 text-orange-600 hover:bg-orange-50"
-    }`}
-  >
-    {followed ? "Following" : "Follow"}
-  </button>
-</div>
+          {/* RIGHT SIDE: Actions (WhatsApp Button Removed) */}
+          <div className="mt-6 md:mt-0 flex items-center gap-2 w-full md:w-auto">
+            {/* FOLLOW BUTTON */}
+            <button
+              onClick={() => setFollowed(!followed)}
+              className={`w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all border ${
+                followed
+                  ? "bg-slate-100 border-transparent text-slate-500"
+                  : "bg-slate-900 border-transparent text-white hover:bg-orange-600"
+              }`}
+            >
+              {followed ? "Following" : "Follow Store"}
+            </button>
+          </div>
 
         </div>
 
         {/* BIO / DESCRIPTION SECTION */}
         <div className="pb-6 border-t border-slate-50 pt-4">
           <p className="text-slate-600 text-sm md:text-base leading-relaxed max-w-3xl">
-            {business.description || "Welcome to our store! We provide high-quality services and products tailored to your needs. Tap the message button to inquire about our latest offers."}
+            {business.description || "Welcome to our store! Explore our latest ready designs and premium style collections."}
           </p>
         </div>
       </div>
