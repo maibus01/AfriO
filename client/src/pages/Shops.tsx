@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ShoppingBag, ArrowLeft, Verified, ExternalLink } from "lucide-react";
-import API from "../api/User"; // ✅ Custom Axios Instance Imported Here
+import API from "../api/User"; // ✅ Uses your custom Axios instance
 
 export default function Shops() {
   const [businesses, setBusinesses] = useState<any[]>([]);
@@ -11,10 +11,11 @@ export default function Shops() {
   useEffect(() => {
     const fetchAndShuffleShops = async () => {
       try {
-        const res = await API.get("/business");
+        // 💥 Hits the brand new route fetching ALL public businesses across the system
+        const res = await API.get("/business/public");
         const fetchedData = res.data.data || [];
 
-        // Fisher-Yates Shuffle Algorithm to randomize shops on every single fresh refresh
+        // Fisher-Yates Shuffle Algorithm to randomize shops on every fresh page load
         const shuffled = [...fetchedData];
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -105,7 +106,7 @@ export default function Shops() {
                   </div>
                 )}
 
-                {/* Info Text Content Segment */}
+                {/* Info Text Content Segment (Tailor Card UI) */}
                 <div className="flex-1 min-w-0">
                   <p className="font-black text-slate-900 text-lg flex items-center gap-1 truncate">
                     {shop.name} <Verified size={16} className="text-blue-500 shrink-0" />
