@@ -8,8 +8,7 @@ const ButtonBar = () => {
   const navItems = [
     { name: "Home", path: "/", icon: <Home size={22} /> },
     { name: "Shop", path: "/shop", icon: <ShoppingBag size={22} /> },
-    { name: "Bulk", path: "/bulk", icon: <Box size={22} /> },
-    { name: "Services", path: "/services", icon: <Settings size={22} /> },
+   
     { name: "Orders", path: "/orders-hub", icon: <ClipboardList size={22} /> },
   ];
 
