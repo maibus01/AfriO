@@ -69,12 +69,13 @@ export default function HomePage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-slate-50 antialiased selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-slate-50 antialiased selection:bg-orange-500 selection:text-white flex flex-col justify-between">
       
-      {/* GLOBAL BACKGROUND ELEMENTS */}
+      {/* GLOBAL BACKGROUND DESIGN ACCENTS */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[500px] bg-gradient-to-b from-orange-500/5 via-transparent to-transparent pointer-events-none blur-3xl z-0" />
 
-      <main className="relative max-w-7xl mx-auto px-4 pt-12 pb-36 z-10">
+      {/* MAIN CONTAINER */}
+      <main className="relative flex-grow max-w-7xl w-full mx-auto px-4 pt-12 pb-16 z-10">
         
         {/* --- HERO SECTION --- */}
         <section className="text-center max-w-3xl mx-auto mb-12">
@@ -202,12 +203,10 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* --- GLOBAL BOTTOM NAVBAR CONTAINER --- */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-        <div className="pointer-events-auto">
-          <ButtonBar />
-        </div>
-      </div>
+      {/* --- HOME-ONLY BOTTOM NAVBAR --- */}
+      <footer className="w-full bg-white dark:bg-gray-900 border-t border-slate-200/60 dark:border-gray-800/80 z-20 mt-auto">
+        <ButtonBar />
+      </footer>
 
     </div>
   );
