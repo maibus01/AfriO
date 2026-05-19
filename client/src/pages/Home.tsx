@@ -1,7 +1,6 @@
- import { useEffect, useState } from "react";
-import { Search, Sparkles, ShoppingBag, ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Sparkles, ShoppingBag, ArrowRight, Loader2 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-
 import ButtonBar from "./components/ButtonBar";
 
 const API = "https://afrio-api.onrender.com/api";
@@ -32,7 +31,7 @@ export default function HomePage() {
   const [styles, setStyles] = useState<Style[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -64,129 +63,152 @@ export default function HomePage() {
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
-  
+
   const filteredStyles = styles.filter((s) =>
     s.title.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <main className="min-h-screen bg-slate-50 dark:bg-gray-950 pb-24">
+    <div className="min-h-screen bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-slate-50 antialiased selection:bg-orange-500 selection:text-white">
       
-<ButtonBar />
+      {/* GLOBAL BACKGROUND ELEMENTS */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[500px] bg-gradient-to-b from-orange-500/5 via-transparent to-transparent pointer-events-none blur-3xl z-0" />
 
-
-      {/* --- HERO SECTION --- */}
-      <section className="px-4 pt-10 pb-8 text-center max-w-5xl mx-auto">
-        <div className="inline-flex items-center gap-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest mb-4">
-          <Sparkles size={12} /> The Future of African Tailoring
-        </div>
+      <main className="relative max-w-7xl mx-auto px-4 pt-12 pb-36 z-10">
         
-        {/* Adjusted text size for mobile (text-3xl) to desktop (text-7xl) */}
-        <h2 className="text-4xl md:text-7xl font-black text-slate-900 dark:text-white mb-6 tracking-tighter leading-tight md:leading-[0.9]">
-          Design Your <span className="text-orange-600 italic font-serif">Identity.</span>
-        </h2>
-        
-        {/* Search Bar: Reduced height and padding for mobile */}
-        <div className="relative group max-w-2xl mx-auto">
-          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-            <Search className="w-5 h-5 text-slate-400 group-focus-within:text-orange-600 transition-colors" />
+        {/* --- HERO SECTION --- */}
+        <section className="text-center max-w-3xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2 bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 border border-orange-200/30">
+            <Sparkles size={12} className="animate-pulse" /> The Future of African Tailoring
           </div>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={tab === 'products' ? "Search fabrics..." : "Search styles..."}
-            className="w-full bg-white dark:bg-gray-900 border-none h-14 md:h-20 pl-14 pr-6 rounded-2xl md:rounded-[2.5rem] shadow-lg shadow-slate-200/60 dark:shadow-none text-sm md:text-lg font-medium focus:ring-4 focus:ring-orange-500/10 outline-none transition-all"
-          />
-        </div>
-      </section>
 
-      {/* --- TAB NAVIGATION: Sticky & Compressed for Mobile --- */}
-      <nav className="flex justify-center mb-8 sticky top-4 z-30 px-4">
-        <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-md p-1.5 rounded-2xl md:rounded-[2.5rem] flex gap-1 shadow-xl border border-white/50 dark:border-gray-800">
-          <button 
-            onClick={() => setTab("products")}
-            className={`flex items-center gap-2 px-6 md:px-10 py-3 md:py-4 rounded-xl md:rounded-[2.2rem] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${
-              tab === 'products' 
-                ? 'bg-slate-900 text-white shadow-md' 
-                : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <ShoppingBag size={14} /> <span className="hidden xs:inline">Marketplace</span><span className="xs:hidden">Shop</span>
-          </button>
-          <button 
-            onClick={() => setTab("styles")}
-            className={`flex items-center gap-2 px-6 md:px-10 py-3 md:py-4 rounded-xl md:rounded-[2.2rem] text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${
-              tab === 'styles' 
-                ? 'bg-slate-900 text-white shadow-md' 
-                : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Sparkles size={14} /> <span className="hidden xs:inline">Inspiration</span><span className="xs:hidden">Styles</span>
-          </button>
-        </div>
-      </nav>
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-slate-900 dark:text-white mb-6 tracking-tighter leading-[1.1] md:leading-[0.95]">
+            Design Your <span className="text-orange-600 italic font-serif font-normal block sm:inline">Identity.</span>
+          </h1>
 
-      {/* --- GRID CONTENT --- */}
-      <section className="max-w-7xl mx-auto px-4">
-        {loading ? (
-          <div className="flex flex-col items-center py-20 space-y-4">
-            <div className="w-8 h-8 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Curating for you</p>
+          {/* Search Bar Wrapper */}
+          <div className="relative group max-w-xl mx-auto mt-8">
+            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none z-10">
+              <Search className="w-5 h-5 text-slate-400 group-focus-within:text-orange-600 transition-colors" />
+            </div>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={tab === 'products' ? "Search fabrics..." : "Search styles..."}
+              className="w-full bg-white dark:bg-gray-900 border border-slate-200/60 dark:border-gray-800/80 h-14 md:h-16 pl-14 pr-6 rounded-2xl shadow-md shadow-slate-200/40 dark:shadow-none text-sm md:text-base font-medium focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all"
+            />
           </div>
-        ) : (
-          /* Grid: grid-cols-2 on small mobile, more on desktop */
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-8">
-            {tab === "products" 
-              ? filteredProducts.map(p => (
-                  <div key={p._id} onClick={() => navigate(`/product/${p._id}`)} className="group cursor-pointer">
-                    <div className="aspect-[4/5] bg-white dark:bg-gray-900 rounded-3xl md:rounded-[2.8rem] overflow-hidden border border-slate-100 dark:border-gray-800 shadow-sm transition-all group-hover:-translate-y-1">
+        </section>
+
+        {/* --- STICKY TAB NAVIGATION --- */}
+        <nav className="flex justify-center mb-12 sticky top-4 z-40">
+          <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg p-1.5 rounded-2xl flex gap-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-gray-800">
+            <button 
+              onClick={() => setTab("products")}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${
+                tab === 'products' 
+                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 shadow-md' 
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <ShoppingBag size={14} /> 
+              <span>Marketplace</span>
+            </button>
+            <button 
+              onClick={() => setTab("styles")}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${
+                tab === 'styles' 
+                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 shadow-md' 
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+              }`}
+            >
+              <Sparkles size={14} /> 
+              <span>Inspiration</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* --- GRID CONTENT --- */}
+        <section>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-24 space-y-3">
+              <Loader2 className="w-8 h-8 text-orange-600 animate-spin" />
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Curating for you</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+              {tab === "products" 
+                ? filteredProducts.map(p => (
+                    <div 
+                      key={p._id} 
+                      onClick={() => navigate(`/product/${p._id}`)} 
+                      className="group cursor-pointer flex flex-col h-full"
+                    >
+                      <div className="aspect-[4/5] w-full bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-slate-100 dark:border-gray-800 shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-md">
+                        <img 
+                          src={p.images?.[0]} 
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                          alt={p.name}
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="mt-3 px-1 flex flex-col flex-grow">
+                        <h3 className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1 truncate">
+                          {p.businessId?.name || 'AfriO Member'}
+                        </h3>
+                        <p className="font-bold text-slate-800 dark:text-slate-100 line-clamp-1 text-sm md:text-base mb-0.5">
+                          {p.name}
+                        </p>
+                        <p className="text-slate-500 dark:text-slate-400 font-extrabold mt-auto text-xs">
+                          ₦{p.price.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                : filteredStyles.map(s => (
+                    <div 
+                      key={s._id} 
+                      onClick={() => navigate(`/style/${s._id}`)} 
+                      className="relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer group shadow-md transition-all duration-300 group-hover:-translate-y-1"
+                    >
                       <img 
-                        src={p.images?.[0]} 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                        alt={p.name}
+                        src={s.image} 
+                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+                        alt={s.title}
+                        loading="lazy"
                       />
-                    </div>
-                    <div className="mt-3 px-1">
-                      <h3 className="text-[8px] font-black text-orange-600 uppercase tracking-widest mb-0.5 truncate">{p.businessId?.name || 'AfriO Member'}</h3>
-                      <p className="font-bold text-slate-900 dark:text-white truncate text-sm md:text-base">{p.name}</p>
-                      <p className="text-slate-500 font-extrabold mt-0.5 text-xs">₦{p.price.toLocaleString()}</p>
-                    </div>
-                  </div>
-                ))
-              : filteredStyles.map(s => (
-                  <div 
-                    key={s._id} 
-                    onClick={() => navigate(`/style/${s._id}`)} 
-                    className="relative aspect-[3/4] rounded-3xl md:rounded-[3rem] overflow-hidden cursor-pointer group shadow-lg"
-                  >
-                    <img 
-                      src={s.image} 
-                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
-                      alt={s.title}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-90" />
-                    
-                    {/* Style Card Content: Scaled down for mobile */}
-                    <div className="absolute bottom-4 left-4 right-4 md:bottom-7 md:left-7 md:right-7">
-                       <p className="text-[8px] text-orange-400 font-black uppercase mb-1 tracking-widest">{s.category || 'Bespoke'}</p>
-                       <h3 className="text-white font-bold text-sm md:text-xl leading-tight mb-2 md:mb-4 line-clamp-2">{s.title}</h3>
-                       <div className="flex items-center gap-1.5 text-white/70 text-[8px] md:text-[10px] font-bold uppercase tracking-widest group-hover:text-white transition-colors">
-                         Custom <ArrowRight size={12} />
-                       </div>
-                    </div>
-                  </div>
-                ))
-            }
-          </div>
-        )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent transition-opacity duration-300 opacity-90 group-hover:opacity-95" />
 
-        {!loading && (tab === "products" ? filteredProducts : filteredStyles).length === 0 && (
-          <div className="text-center py-24">
-            <p className="text-slate-300 font-bold italic">No results found</p>
-          </div>
-        )}
-      </section>
-    </main>
+                      {/* Style Card Content */}
+                      <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 z-10">
+                         <p className="text-[8px] text-orange-400 font-black uppercase mb-1 tracking-widest">{s.category || 'Bespoke'}</p>
+                         <h3 className="text-white font-bold text-sm md:text-lg leading-snug mb-3 line-clamp-2">{s.title}</h3>
+                         <div className="flex items-center gap-1.5 text-white/70 text-[9px] font-black uppercase tracking-widest group-hover:text-white transition-colors">
+                           Custom <ArrowRight size={12} className="transition-transform group-hover:translate-x-1" />
+                         </div>
+                      </div>
+                    </div>
+                  ))
+              }
+            </div>
+          )}
+
+          {!loading && (tab === "products" ? filteredProducts : filteredStyles).length === 0 && (
+            <div className="text-center py-24 border border-dashed border-slate-200 dark:border-gray-800 rounded-3xl">
+              <p className="text-slate-400 dark:text-slate-600 font-medium italic">No matches found for your search.</p>
+            </div>
+          )}
+        </section>
+      </main>
+
+      {/* --- GLOBAL BOTTOM NAVBAR CONTAINER --- */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="pointer-events-auto">
+          <ButtonBar />
+        </div>
+      </div>
+
+    </div>
   );
 }
