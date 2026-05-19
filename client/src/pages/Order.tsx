@@ -191,23 +191,24 @@ const OrderPage = () => {
         </div>
       </div>
 
-      {/* FIXED FOOTER BUTTON */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-100">
-        <button
-          onClick={handleCompleteOrder}
-          disabled={processingOrder || !selectedAccount}
-          className="max-w-xl mx-auto w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 transition-transform active:scale-[0.98] disabled:bg-slate-300 shadow-lg shadow-green-200"
-        >
-          {processingOrder ? (
-            <Loader2 className="animate-spin" />
-          ) : (
-            <>
-              <MessageCircle size={20} fill="currentColor" />
-              SEND PAYMENT RECEIPT
-            </>
-          )}
-        </button>
-      </div>
+ 
+{/* FIXED FOOTER BUTTON */}
+<div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-100 z-50 flex justify-center">
+  <button
+    onClick={handleCompleteOrder}
+    disabled={processingOrder || !selectedAccount}
+    className="max-w-xl w-full bg-orange-600 hover:bg-orange-700 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none shadow-lg shadow-orange-100"
+  >
+    {processingOrder ? (
+      <Loader2 className="animate-spin" />
+    ) : (
+      "I HAVE MADE THE TRANSFER"
+    )}
+  </button>
+</div>
+
+
+
     </div>
   );
 };
