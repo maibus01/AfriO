@@ -153,36 +153,62 @@ export const getAllUsers = async (
 
 // ==========================
 // ✅ UPDATE USER
+
+
 export const updateMe = async (
   req: Request & { user?: any; file?: any },
   res: Response,
   next: NextFunction
 ) => {
   try {
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+    console.log("USER:", req.user);
+
+    // ❗ Prevent crash if auth failed
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized - no user found in request",
+      });
+    }
+
     const updates: any = {};
 
     if (req.body.name) updates.name = req.body.name;
     if (req.body.phone) updates.phone = req.body.phone;
 
-    // 🔥 BREAKPOINT 1: THE CLOUDINARY STAGE
+    // 🔥 IMAGE UPLOAD
     if (req.file) {
       const result = await uploadToCloudinary(req.file.buffer);
       updates.photo = result.secure_url;
     }
 
-    // 💥 BREAKPOINT 2: THE DATABASE STAGE
+    const userId = req.user._id || req.user.id;
+
     const user = await User.findByIdAndUpdate(
-      req.user.id, 
+      userId,
       { $set: updates },
       { new: true, runValidators: true }
     );
 
-    res.status(200).json({ success: true, user });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      user,
+    });
   } catch (err) {
-    console.error("🔥 UPDATE ERROR:", err); // This prints inside Render's Dashboard!
-    next(err); // This sends a generic 500 error back to your browser console
+    console.error("🔥 UPDATE ERROR:", err);
+    next(err);
   }
 };
+
 // ==========================
 // 🔐 UPDATE PASSWORD
 // ==========================
