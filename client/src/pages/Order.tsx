@@ -73,9 +73,8 @@ const OrderPage = () => {
 
       const orderId = res.data.order._id;
 
-      // ✅ FIXED MESSAGE
-      const message = encodeURIComponent(`
-💎 *LUXEE ORDER RECEIPT*
+      // Cleaned text alignment to prevent unwanted space formatting in WhatsApp
+      const rawMessage = `💎 *LUXEE ORDER RECEIPT*
 
 *Order ID:* ${orderId.slice(-6).toUpperCase()}
 *Product:* ${product.name}
@@ -83,14 +82,14 @@ const OrderPage = () => {
 *Total Amount:* ₦${totalPrice.toLocaleString()}
 
 *Payment To:* ${selectedAccount.bankName}
-Note: I have made the transfer. Please verify.
-`);
+Note: I have made the transfer. Please verify.`;
 
+      const message = encodeURIComponent(rawMessage);
       const phone = "2349027456061";
 
-      // ✅ FIXED URL
+      // Redirecting via the robust WhatsApp send API
       window.open(
-        `https://wa.me/${phone.replace(/\D/g, "")}?text=${message}`,
+        `https://api.whatsapp.com/send?phone=${phone}&text=${message}`,
         "_blank"
       );
     } catch (err: any) {
@@ -151,12 +150,8 @@ Note: I have made the transfer. Please verify.
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Items
               </p>
-              <h3 className="font-bold text-slate-800">
-                {product.name}
-              </h3>
-              <p className="text-sm text-slate-500">
-                Qty: {quantity}
-              </p>
+              <h3 className="font-bold text-slate-800">{product.name}</h3>
+              <p className="text-sm text-slate-500">Qty: {quantity}</p>
             </div>
             <div className="text-right">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -191,18 +186,14 @@ Note: I have made the transfer. Please verify.
                 }`}
               >
                 <div className="flex justify-between items-center">
-                  <p className="font-bold text-slate-800">
-                    {acc.bankName}
-                  </p>
+                  <p className="font-bold text-slate-800">{acc.bankName}</p>
 
                   {selectedAccount?._id === acc._id && (
                     <div className="w-4 h-4 bg-orange-500 rounded-full border-4 border-orange-100" />
                   )}
                 </div>
 
-                <p className="text-sm text-slate-600">
-                  {acc.accountNumber}
-                </p>
+                <p className="text-sm text-slate-600">{acc.accountNumber}</p>
               </div>
             ))
           )}
@@ -240,12 +231,8 @@ Note: I have made the transfer. Please verify.
 
               <div className="flex justify-between border-t border-white/10 pt-4">
                 <div>
-                  <p className="text-[10px] opacity-50 uppercase">
-                    Bank
-                  </p>
-                  <p className="font-bold text-sm">
-                    {selectedAccount.bankName}
-                  </p>
+                  <p className="text-[10px] opacity-50 uppercase">Bank</p>
+                  <p className="font-bold text-sm">{selectedAccount.bankName}</p>
                 </div>
 
                 <div className="text-right">
@@ -270,9 +257,9 @@ Note: I have made the transfer. Please verify.
           </div>
 
           <p className="text-xs text-orange-800 leading-relaxed">
-            <b>Secure Order:</b> Transfer the exact amount shown above,
-            then click the button below to send your receipt on WhatsApp
-            for confirmation.
+            <b>Secure Order:</b> Transfer the exact amount shown above, then
+            click the button below to send your receipt on WhatsApp for
+            confirmation.
           </p>
         </div>
       </div>
