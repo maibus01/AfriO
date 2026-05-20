@@ -5,13 +5,35 @@ import { Business } from "../models/Business";
 // =========================
 // CREATE STYLE (TAILOR ONLY)
 // =========================
-export const createStyle = async (
-  req: Request,
-  res: Response
-) => {
+export const createStyle = async (req: Request, res: Response) => {
   try {
-    const { title, description, images, category, businessId} = req.body;
+       const {
+      title,
+      description,
+      images,
+      category,
+      businessId,
+    
+    } = req.body;
 
+    // ✅ VALIDATIONS (prevent 500 errors)
+    if (!title || title.trim() === "") {
+      return res.status(400).json({ message: "Title is required" });
+    }
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ message: "At least one image is required" });
+    }
+
+    if (!businessId) {
+      return res.status(400).json({ message: "Business ID is required" });
+    }
+
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // ✅ FIND BUSINESS
     const business = await Business.findById(businessId);
 
     if (!business) {
@@ -28,24 +50,29 @@ export const createStyle = async (
       });
     }
 
+    // ✅ CREATE STYLE
     const style = await Style.create({
-      title,
+      title: title.trim(),
       description,
       images,
       category,
       businessId,
       ownerId: req.user.id,
+    
     });
 
     res.status(201).json({
       success: true,
       data: style,
     });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
+  } catch (err: any) {
+    console.error("🔥 CREATE STYLE ERROR:", err);
+
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
-
 // =========================
 // GET MY STYLES
 // =========================

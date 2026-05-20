@@ -6,6 +6,7 @@ import TailorRequestManager from "./TailorRequested";
 
 const API = "https://afrio-api.onrender.com/api";
 
+
 type Style = {
   _id: string;
   title: string;
@@ -73,16 +74,50 @@ export default function StylesPage() {
   };
 
   const createStyle = async () => {
-    if (!business?._id) return;
-    try {
-      const res = await axios.post(`${API}/styles`, { ...form, businessId: business._id }, {
+  if (!business?._id) return;
+
+  // ✅ FRONTEND VALIDATION
+  if (!form.title.trim()) {
+    alert("Title is required");
+    return;
+  }
+
+  if (form.images.length === 0) {
+    alert("Please upload at least one image");
+    return;
+  }
+
+  try {
+    const res = await axios.post(
+      `${API}/styles`,
+      {
+        title: form.title.trim(),
+        description: form.description,
+        images: form.images,
+        category: form.category,
+        businessId: business._id,
+      },
+      {
         headers: { Authorization: `Bearer ${token}` },
-      });
-      setStyles((prev) => [res.data.data, ...prev]);
-      setForm({ title: "", description: "", images: [], category: "modern" });
-      setOpen(false);
-    } catch (err) { console.log(err); }
-  };
+      }
+    );
+
+    setStyles((prev) => [res.data.data, ...prev]);
+
+    // ✅ RESET FORM
+    setForm({
+      title: "",
+      description: "",
+      images: [],
+      category: "modern",
+    });
+
+    setOpen(false);
+  } catch (err: any) {
+    console.error(err);
+    alert(err.response?.data?.message || "Something went wrong");
+  }
+};
 
   const updateStyle = async () => {
     if (!editMode) return;
