@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User";
+import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
 
 // 🔧 Normalize phone (GLOBAL)
 const normalizePhone = (phone: string): string => {
@@ -148,43 +153,40 @@ export const getAllUsers = async (
 
 // ==========================
 // ✅ UPDATE USER
-// ==========================
 export const updateMe = async (
-  req: Request,
+  req: Request & { user?: any; file?: any },
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const allowedFields = ["name", "photo", "phone"];
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+    console.log("FILE:", req.file);
 
     const updates: any = {};
 
-    Object.keys(req.body).forEach((key) => {
-      if (allowedFields.includes(key)) {
-        updates[key] = req.body[key];
-      }
-    });
+    if (req.body.name) updates.name = req.body.name;
+    if (req.body.phone) updates.phone = req.body.phone;
 
-    // normalize phone if updated
-    if (updates.phone) {
-      updates.phone = normalizePhone(updates.phone);
+    // 🔥 IMAGE UPLOAD
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer);
+      updates.photo = result.secure_url;
     }
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      updates,
-      {
-        new: true,
-        runValidators: true,
-      }
+      { $set: updates },
+      { new: true, runValidators: true }
     );
 
     res.status(200).json({
       success: true,
       user,
-      whatsappLink: `https://wa.me/${user?.phone}`,
     });
   } catch (err) {
+    console.log("FILE:", req.file);
+    console.error("🔥 UPDATE ERROR:", err);
     next(err);
   }
 };
