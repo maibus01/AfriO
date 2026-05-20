@@ -308,7 +308,7 @@ import axios from "axios";
 import { Package, Plus, Trash2, X } from "lucide-react";
 import MeasurementManager from "../pages/Measurement";
 
-const API = "http://localhost:5000/api";
+const API = "https://afrio-api.onrender.com/api";
 
 // =====================
 // TYPES
