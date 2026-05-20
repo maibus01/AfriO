@@ -127,6 +127,30 @@ export const getBusinessPublic = async (req: Request, res: Response) => {
   }
 };
 
+
+// ✅ GET ALL PUBLIC BUSINESSES
+export const getAllBusinessesPublic = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    // 1. Find all businesses where isActive is true (ignoring deleted/hidden ones)
+    const businesses = await Business.find({ isActive: true });
+
+    // 2. Return them in an array under the 'data' key so your Shops.tsx reads it perfectly
+    res.status(200).json({
+      success: true,
+      data: businesses,
+    });
+  } catch (err) {
+    // 3. Forward any server/DB errors to your express handler
+    next(err);
+  }
+};
+
+
+
 // ✅ UPDATE BUSINESS
 export const updateBusiness = async (
   req: Request,

@@ -20,13 +20,15 @@ import AdminOrders from "./pages/AdminOrders";
 import AdminRequests from "./pages/AdminStyleRequest";
 import RequestPaymentPage from "./pages/RequestPaymentPage";
 
+import OrderHub from "./pages/OrderHub";
+import Shops from "./pages/Shops";
+
 
 function App() {
   return (
     <CartProvider>
       <Router>
         <Navbar />
-
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} />
@@ -46,6 +48,10 @@ function App() {
             path="/dashboard/business/:id"
             element={<BusinessDashboard />}
           />
+
+<Route path="/orders-hub" element={<OrderHub />} />
+
+<Route path="/shop" element={<Shops />} />
 
           <Route path="/chat" element={<ChatPage />} />
 

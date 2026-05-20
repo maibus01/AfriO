@@ -6,13 +6,16 @@ import {
   updateBusiness,
   deleteBusiness,
   getBusinessPublic,
+  getAllBusinessesPublic,
 } from "../controllers/businessController";
 
 import { protect } from "../middleware/authMiddleware";
 
 const router = express.Router();
 
-router.get("/:id/public", getBusinessPublic); 
+router.get("/:id/public", getBusinessPublic);
+
+router.get("/public", getAllBusinessesPublic);
 
 router.use(protect);
 

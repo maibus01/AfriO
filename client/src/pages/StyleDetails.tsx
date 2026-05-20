@@ -70,10 +70,7 @@ export default function StyleDetails() {
   const handleSendRequest = async () => {
     if (sending) return;
 
-    if (!selectedM) {
-      alert("Please select a measurement");
-      return;
-    }
+    
 
     try {
       setSending(true);
@@ -98,7 +95,7 @@ export default function StyleDetails() {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <div className="font-black text-4xl text-orange-500 animate-bounce">AFRIO</div>
+        <div className="font-black text-4xl text-orange-500 animate-bounce">LUXEE</div>
       </div>
     );
   }
@@ -203,7 +200,6 @@ export default function StyleDetails() {
 
               <button
                 onClick={handleSendRequest}
-                disabled={sending || !selectedM}
                 className="w-full bg-slate-900 text-white py-6 rounded-2xl font-black text-xl flex items-center justify-center gap-3 hover:bg-orange-600 transition-all shadow-xl disabled:bg-slate-200"
               >
                 {sending ? "Processing..." : "Send Request to Tailor"}
