@@ -378,10 +378,10 @@ export default function Profile() {
     formData.append("photo", file);
 
     try {
+      // 💡 Remowed manual Content-Type header so Axios calculates form boundaries safely
       const res = await axios.patch(`${API}/auth/update-me`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
         },
       });
 
@@ -473,18 +473,23 @@ export default function Profile() {
 
         {/* INFO */}
         <div className="flex-1 space-y-2">
-
           <input
             value={user.name}
             onChange={(e) =>
               setUser((prev) => (prev ? { ...prev, name: e.target.value } : prev))
             }
             onBlur={async () => {
-              await axios.patch(
-                `${API}/auth/update-me`,
-                { name: user.name },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
+              // 💡 Text must be packaged as FormData because backend router forces Multer parsing
+              const data = new FormData();
+              data.append("name", user.name);
+
+              try {
+                await axios.patch(`${API}/auth/update-me`, data, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+              } catch (err) {
+                console.error("NAME UPDATE ERROR:", err);
+              }
             }}
             className="bg-transparent text-2xl font-bold outline-none"
           />
@@ -499,11 +504,17 @@ export default function Profile() {
               )
             }
             onBlur={async () => {
-              await axios.patch(
-                `${API}/auth/update-me`,
-                { phone: user.phone },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
+              // 💡 Text must be packaged as FormData because backend router forces Multer parsing
+              const data = new FormData();
+              data.append("phone", user.phone || "");
+
+              try {
+                await axios.patch(`${API}/auth/update-me`, data, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+              } catch (err) {
+                console.error("PHONE UPDATE ERROR:", err);
+              }
             }}
             className="bg-transparent text-sm outline-none"
             placeholder="Add phone"

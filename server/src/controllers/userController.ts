@@ -159,38 +159,30 @@ export const updateMe = async (
   next: NextFunction
 ) => {
   try {
-    console.log("BODY:", req.body);
-    console.log("FILE:", req.file);
-    console.log("FILE:", req.file);
-
     const updates: any = {};
 
     if (req.body.name) updates.name = req.body.name;
     if (req.body.phone) updates.phone = req.body.phone;
 
-    // 🔥 IMAGE UPLOAD
+    // 🔥 BREAKPOINT 1: THE CLOUDINARY STAGE
     if (req.file) {
       const result = await uploadToCloudinary(req.file.buffer);
       updates.photo = result.secure_url;
     }
 
+    // 💥 BREAKPOINT 2: THE DATABASE STAGE
     const user = await User.findByIdAndUpdate(
-      req.user.id,
+      req.user.id, 
       { $set: updates },
       { new: true, runValidators: true }
     );
 
-    res.status(200).json({
-      success: true,
-      user,
-    });
+    res.status(200).json({ success: true, user });
   } catch (err) {
-    console.log("FILE:", req.file);
-    console.error("🔥 UPDATE ERROR:", err);
-    next(err);
+    console.error("🔥 UPDATE ERROR:", err); // This prints inside Render's Dashboard!
+    next(err); // This sends a generic 500 error back to your browser console
   }
 };
-
 // ==========================
 // 🔐 UPDATE PASSWORD
 // ==========================
