@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { Plus, Trash2, Edit3, Search, LayoutGrid, ClipboardList, X } from "lucide-react";
 import BusinessHero from "../components/BusinessHero";
-import TailorRequestManager from "./TailorRequested"; // This is the file we made earlier
+import TailorRequestManager from "./TailorRequested"; 
 
 const API = "https://afrio-api.onrender.com/api";
 
@@ -10,7 +10,7 @@ type Style = {
   _id: string;
   title: string;
   description?: string;
-  image: string;
+  images: string[]; // Changed from 'image: string' to support multiple images
   category: string;
 };
 
@@ -22,13 +22,14 @@ export default function StylesPage() {
   const [editMode, setEditMode] = useState<Style | null>(null);
   const [search, setSearch] = useState("");
   const [business, setBusiness] = useState<any>(null);
+  const [uploading, setUploading] = useState(false); // Track file upload progress status
 
   const token = localStorage.getItem("token");
 
   const [form, setForm] = useState({
     title: "",
     description: "",
-    image: "",
+    images: [] as string[], // Match the multi-image structure
     category: "modern",
   });
 
@@ -52,6 +53,25 @@ export default function StylesPage() {
     fetchInitialData();
   }, [token]);
 
+  // Image upload service linking to your auth API endpoint
+  const uploadStyleImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    try {
+      setUploading(true);
+      const res = await axios.patch(`${API}/auth/update-me`, formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.data?.user?.photo; 
+    } catch (err) {
+      console.error("UPLOAD ERROR:", err);
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const createStyle = async () => {
     if (!business?._id) return;
     try {
@@ -59,7 +79,7 @@ export default function StylesPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setStyles((prev) => [res.data.data, ...prev]);
-      setForm({ title: "", description: "", image: "", category: "modern" });
+      setForm({ title: "", description: "", images: [], category: "modern" });
       setOpen(false);
     } catch (err) { console.log(err); }
   };
@@ -148,12 +168,22 @@ export default function StylesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {filtered.map((s) => (
                 <div key={s._id} className="group bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500">
-                  <div className="relative h-64 overflow-hidden">
-                    <img src={s.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
-                    <div className="absolute top-4 left-4">
+                  <div className="relative h-64 overflow-hidden bg-slate-100">
+                    {/* Render first image from the collection safely */}
+                    <img 
+                      src={s.images?.[0] || "https://placehold.co/600x400?text=No+Image"} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                      alt={s.title} 
+                    />
+                    <div className="absolute top-4 left-4 flex gap-2">
                       <span className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-slate-900 shadow-sm">
                         {s.category}
                       </span>
+                      {s.images && s.images.length > 1 && (
+                        <span className="bg-orange-600 text-white px-2.5 py-1 rounded-full text-[9px] font-black tracking-widest shadow-sm">
+                          +{s.images.length - 1} Photos
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -179,7 +209,7 @@ export default function StylesPage() {
         )}
       </div>
 
-      {/* --- MODALS (Enhanced UI) --- */}
+      {/* --- MODALS (Enhanced with Multi-image Selector) --- */}
       {(open || editMode) && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
@@ -188,7 +218,7 @@ export default function StylesPage() {
               <button onClick={() => { setOpen(false); setEditMode(null); }} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
             </div>
 
-            <div className="p-8 space-y-5">
+            <div className="p-8 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Style Title</label>
                 <input
@@ -199,14 +229,56 @@ export default function StylesPage() {
                 />
               </div>
 
+              {/* MULTI-IMAGE UPLOAD AREA */}
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Image Link</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Lookbook Assets</label>
                 <input
-                  value={editMode ? editMode.image : form.image}
-                  placeholder="https://..."
-                  className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
-                  onChange={(e) => editMode ? setEditMode({ ...editMode, image: e.target.value }) : setForm({ ...form, image: e.target.value })}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="w-full bg-slate-50 border-none h-14 px-5 py-3 rounded-2xl outline-none file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-black file:uppercase file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300"
+                  onChange={async (e) => {
+                    const files = e.target.files;
+                    if (!files) return;
+
+                    const uploaded: string[] = [];
+                    for (const file of Array.from(files)) {
+                      const url = await uploadStyleImage(file);
+                      if (url) uploaded.push(url);
+                    }
+
+                    if (editMode) {
+                      setEditMode({ ...editMode, images: [...(editMode.images || []), ...uploaded] });
+                    } else {
+                      setForm({ ...form, images: [...form.images, ...uploaded] });
+                    }
+                  }}
                 />
+
+                {/* Upload Spinner feedback */}
+                {uploading && <p className="text-xs text-orange-600 animate-pulse pl-2 font-bold">Uploading design assets...</p>}
+
+                {/* Micro Images Thumbnail Grid Preview */}
+                <div className="flex gap-2 flex-wrap mt-3 p-1">
+                  {(editMode ? editMode.images : form.images)?.map((img, i) => (
+                    <div key={i} className="relative group/thumb w-16 h-16 rounded-xl overflow-hidden border border-slate-100">
+                      <img src={img} className="w-full h-full object-cover" alt="" />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (editMode) {
+                            setEditMode({ ...editMode, images: editMode.images.filter((_, idx) => idx !== i) });
+                          } else {
+                            setForm({ ...form, images: form.images.filter((_, idx) => idx !== i) });
+                          }
+                        }}
+                        className="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity text-white text-[10px] font-bold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {!editMode && (
@@ -214,6 +286,7 @@ export default function StylesPage() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Category</label>
                   <select
                     className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
+                    value={form.category}
                     onChange={(e) => setForm({ ...form, category: e.target.value })}
                   >
                     <option value="modern">Modern</option>
@@ -228,14 +301,15 @@ export default function StylesPage() {
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Description</label>
                 <textarea
                   value={editMode ? editMode.description : form.description}
-                  className="w-full bg-slate-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 h-24"
+                  className="w-full bg-slate-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 h-24 resize-none"
                   onChange={(e) => editMode ? setEditMode({ ...editMode, description: e.target.value }) : setForm({ ...form, description: e.target.value })}
                 />
               </div>
 
               <button
                 onClick={editMode ? updateStyle : createStyle}
-                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-slate-200 mt-4"
+                disabled={uploading}
+                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-slate-200 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {editMode ? "Update Collection" : "Publish to Gallery"}
               </button>

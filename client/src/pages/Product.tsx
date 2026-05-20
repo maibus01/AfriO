@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { 
-  Plus, Trash2, Search, Edit3, 
+import {
+  Plus, Trash2, Search, Edit3,
   LayoutGrid, ClipboardList, X,
 } from "lucide-react";
 import BusinessHero from "../components/BusinessHero";
@@ -36,7 +36,7 @@ export default function VendorDashboard() {
     category: "fabric",
     stock: "",
     description: "",
-    images: "",
+    images: [] as string[],
   });
 
   useEffect(() => {
@@ -61,11 +61,12 @@ export default function VendorDashboard() {
 
   const createProduct = async () => {
     if (!business?._id) return;
+
     const payload = {
       ...form,
       price: Number(form.price),
       stock: Number(form.stock),
-      images: form.images.split(",").map((i) => i.trim()),
+      images: form.images, // already array of uploaded URLs
       businessId: business._id,
     };
 
@@ -73,21 +74,58 @@ export default function VendorDashboard() {
       const res = await axios.post(`${API}/products`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       setProducts((prev) => [res.data.data, ...prev]);
+
+      // ✅ FIXED RESET (IMPORTANT)
       setOpen(false);
-      setForm({ name: "", price: "", category: "fabric", stock: "", description: "", images: "" });
-    } catch (err) { console.log(err); }
+      setForm({
+        name: "",
+        price: "",
+        category: "fabric",
+        stock: "",
+        description: "",
+        images: [], // ✅ must be array, not string
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const uploadProductImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    try {
+      const res = await axios.patch(`${API}/auth/update-me`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      return res.data?.user?.photo; // same response pattern you used
+    } catch (err) {
+      console.error("UPLOAD ERROR:", err);
+      return null;
+    }
   };
 
   const updateProduct = async () => {
     if (!editMode) return;
-    try {
-      const res = await axios.patch(`${API}/products/${editMode._id}`, editMode, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setProducts(prev => prev.map(p => (p._id === editMode._id ? res.data.data : p)));
-      setEditMode(null);
-    } catch (err) { console.log(err); }
+
+    const payload = {
+      ...editMode,
+    };
+
+    const res = await axios.patch(`${API}/products/${editMode._id}`, payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    setProducts(prev =>
+      prev.map(p => (p._id === editMode._id ? res.data.data : p))
+    );
+
+    setEditMode(null);
   };
 
   const deleteProduct = async (id: string) => {
@@ -111,17 +149,17 @@ export default function VendorDashboard() {
       {business && <BusinessHero business={business} />}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
+
         {/* --- NAVIGATION TABS --- */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-10">
           <div className="bg-slate-200/60 p-1.5 rounded-[2rem] flex gap-2 w-full md:w-auto">
-            <button 
+            <button
               onClick={() => setActiveTab("inventory")}
               className={`flex-1 md:w-48 flex items-center justify-center gap-2 py-3 rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'inventory' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <LayoutGrid size={16} /> Inventory
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab("orders")}
               className={`flex-1 md:w-48 flex items-center justify-center gap-2 py-3 rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'orders' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
@@ -142,7 +180,7 @@ export default function VendorDashboard() {
         {/* --- CONTENT AREA --- */}
         {activeTab === "orders" ? (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <SellerOrderManager />
+            <SellerOrderManager />
           </div>
         ) : (
           <div className="animate-in fade-in duration-500">
@@ -177,7 +215,7 @@ export default function VendorDashboard() {
                       <h2 className="font-bold text-slate-900 text-lg leading-tight">{p.name}</h2>
                       <p className="text-orange-600 font-black text-lg">₦{p.price.toLocaleString()}</p>
                     </div>
-                    
+
                     <p className="text-slate-500 text-xs line-clamp-2 mb-6 min-h-[32px]">
                       {p.description || "Premium quality supplies for master artisans."}
                     </p>
@@ -206,7 +244,7 @@ export default function VendorDashboard() {
               <h2 className="text-2xl font-black text-slate-900">{editMode ? "Edit Product" : "New Product"}</h2>
               <button onClick={() => { setOpen(false); setEditMode(null); }} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
             </div>
-            
+
             <div className="p-8 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -214,7 +252,7 @@ export default function VendorDashboard() {
                   <input
                     value={editMode ? editMode.name : form.name}
                     className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
-                    onChange={(e) => editMode ? setEditMode({...editMode, name: e.target.value}) : setForm({...form, name: e.target.value})}
+                    onChange={(e) => editMode ? setEditMode({ ...editMode, name: e.target.value }) : setForm({ ...form, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1">
@@ -223,7 +261,7 @@ export default function VendorDashboard() {
                     type="number"
                     value={editMode ? editMode.price : form.price}
                     className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
-                    onChange={(e) => editMode ? setEditMode({...editMode, price: Number(e.target.value)}) : setForm({...form, price: e.target.value})}
+                    onChange={(e) => editMode ? setEditMode({ ...editMode, price: Number(e.target.value) }) : setForm({ ...form, price: e.target.value })}
                   />
                 </div>
               </div>
@@ -233,7 +271,7 @@ export default function VendorDashboard() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Category</label>
                   <select
                     className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
-                    onChange={(e) => editMode ? setEditMode({...editMode, category: e.target.value}) : setForm({...form, category: e.target.value})}
+                    onChange={(e) => editMode ? setEditMode({ ...editMode, category: e.target.value }) : setForm({ ...form, category: e.target.value })}
                   >
                     <option value="fabric">Fabric</option>
                     <option value="shoes">Shoes</option>
@@ -247,19 +285,53 @@ export default function VendorDashboard() {
                     type="number"
                     value={editMode ? editMode.stock : form.stock}
                     className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
-                    onChange={(e) => editMode ? setEditMode({...editMode, stock: Number(e.target.value)}) : setForm({...form, stock: e.target.value})}
+                    onChange={(e) => editMode ? setEditMode({ ...editMode, stock: Number(e.target.value) }) : setForm({ ...form, stock: e.target.value })}
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Image Link(s)</label>
-                <input
-                  placeholder="Link 1, Link 2..."
-                  value={editMode ? editMode.images.join(",") : form.images}
-                  className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
-                  onChange={(e) => editMode ? setEditMode({...editMode, images: e.target.value.split(",")}) : setForm({...form, images: e.target.value})}
-                />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
+                    Product Images
+                  </label>
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl"
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (!files) return;
+
+                      const uploaded: string[] = [];
+
+                      for (const file of Array.from(files)) {
+                        const url = await uploadProductImage(file);
+                        if (url) uploaded.push(url);
+                      }
+
+                      if (editMode) {
+                        setEditMode({ ...editMode, images: uploaded });
+                      } else {
+                        setForm({ ...form, images: uploaded });
+                      }
+                    }}
+                  />
+
+                  {/* preview like your BusinessPage */}
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    {(editMode ? editMode.images : form.images).map((img, i) => (
+                      <img
+                        key={i}
+                        src={img}
+                        className="w-14 h-14 rounded-xl object-cover border"
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -267,7 +339,7 @@ export default function VendorDashboard() {
                 <textarea
                   value={editMode ? editMode.description : form.description}
                   className="w-full bg-slate-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 h-24"
-                  onChange={(e) => editMode ? setEditMode({...editMode, description: e.target.value}) : setForm({...form, description: e.target.value})}
+                  onChange={(e) => editMode ? setEditMode({ ...editMode, description: e.target.value }) : setForm({ ...form, description: e.target.value })}
                 />
               </div>
 

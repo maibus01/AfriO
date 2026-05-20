@@ -10,7 +10,7 @@ export const createStyle = async (
   res: Response
 ) => {
   try {
-    const { title, description, image, category, businessId } = req.body;
+    const { title, description, images, category, businessId} = req.body;
 
     const business = await Business.findById(businessId);
 
@@ -31,7 +31,7 @@ export const createStyle = async (
     const style = await Style.create({
       title,
       description,
-      image,
+      images,
       category,
       businessId,
       ownerId: req.user.id,
@@ -121,7 +121,7 @@ export const updateStyle = async (
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    const allowed = ["title", "description", "image", "category"];
+    const allowed = ["title", "description", "images", "category"];
 
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) {

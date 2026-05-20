@@ -59,9 +59,9 @@ export default function BusinessPage() {
 
     try {
       const config = {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json" 
+          "Content-Type": "application/json"
         },
       };
 
@@ -96,6 +96,30 @@ export default function BusinessPage() {
     setOpen(false);
     setEditId(null);
     setForm(INITIAL_FORM);
+  };
+
+  const uploadImage = async (file: File, field: "logo" | "coverImage") => {
+    const formData = new FormData();
+    formData.append("photo", file);
+
+    try {
+      const res = await axios.patch(`${API}/auth/update-me`, formData, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      const url = res.data?.user?.photo;
+
+      if (url) {
+        setForm((prev) => ({
+          ...prev,
+          [field]: url,
+        }));
+      }
+    } catch (err) {
+      console.error("UPLOAD ERROR:", err);
+    }
   };
 
   const hasTailor = businesses.some((b) => b.category === "tailor");
@@ -185,7 +209,7 @@ export default function BusinessPage() {
             <div className="relative bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
               <div className="p-8 border-b border-slate-50 flex justify-between items-center">
                 <h2 className="text-2xl font-black text-slate-800">{editId ? "Update Profile" : "Launch Store"}</h2>
-                <button onClick={closeModal} className="bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                <button onClick={closeModal} className="bg-slate-100 p-2 rounded-full text-slate-400 hover:text-slate-600"><X size={20} /></button>
               </div>
 
               <div className="p-8 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -206,11 +230,19 @@ export default function BusinessPage() {
                       <div className="relative mt-1">
                         <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                         <input
-                          className="w-full bg-slate-50 border-none rounded-2xl p-4 pl-10 text-sm font-medium outline-none focus:ring-2 focus:ring-orange-500"
-                          placeholder="https://..."
-                          value={form.logo}
-                          onChange={(e) => setForm({ ...form, logo: e.target.value })}
+                          type="file"
+                          accept="image/*"
+                          className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            uploadImage(file, "logo");
+                          }}
                         />
+
+                        {form.logo && (
+                          <img src={form.logo} className="w-12 h-12 mt-2 rounded-xl object-cover" />
+                        )}
                       </div>
                     </label>
                     <label>
@@ -218,19 +250,27 @@ export default function BusinessPage() {
                       <div className="relative mt-1">
                         <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                         <input
-                          className="w-full bg-slate-50 border-none rounded-2xl p-4 pl-10 text-sm font-medium outline-none focus:ring-2 focus:ring-orange-500"
-                          placeholder="https://..."
-                          value={form.coverImage}
-                          onChange={(e) => setForm({ ...form, coverImage: e.target.value })}
+                          type="file"
+                          accept="image/*"
+                          className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            uploadImage(file, "coverImage");
+                          }}
                         />
+
+                        {form.coverImage && (
+                          <img src={form.coverImage} className="w-full h-20 mt-2 rounded-xl object-cover" />
+                        )}
                       </div>
                     </label>
                   </div>
 
                   <div className="flex gap-4">
                     <label className="flex-1">
-                       <span className="text-xs font-black uppercase text-slate-400 ml-2">Phone</span>
-                       <input
+                      <span className="text-xs font-black uppercase text-slate-400 ml-2">Phone</span>
+                      <input
                         className="w-full mt-1 bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-500"
                         placeholder="+234..."
                         value={form.phone}
