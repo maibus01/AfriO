@@ -1,9 +1,10 @@
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
-  cloud_name: "LuxeeHub",
-  api_key: "233243848937431",
-  api_secret: "uD-79L8pWUDGNeMK4yuL8RlHOP8",
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
 });
 
 export default cloudinary;

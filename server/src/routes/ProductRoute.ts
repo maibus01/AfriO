@@ -10,6 +10,7 @@ import {
 } from "../controllers/productController";
 
 import { protect } from "../middleware/authMiddleware";
+import { uploadProductImages } from "../middleware/upload";
 
 const router = express.Router();
 
@@ -22,8 +23,8 @@ router.get("/:id", getProductById); // MUST be last public route
 // 🔐 PROTECTED routes
 router.use(protect);
 
-router.post("/", createProduct);
-router.patch("/:id", updateProduct);
+router.post("/", uploadProductImages, createProduct);
+router.patch("/:id", uploadProductImages, updateProduct);
 router.delete("/:id", deleteProduct);
 
 export default router;

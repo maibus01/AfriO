@@ -3,7 +3,8 @@ import axios from "axios";
 import { Package, Scissors } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
-const API = "https://afrio-api.onrender.com/api";
+const API =
+  import.meta.env.VITE_API_URL || "https://afrio-api.onrender.com/api";
 
 export default function BusinessDashboard() {
   const { id } = useParams();
@@ -51,7 +52,6 @@ export default function BusinessDashboard() {
 
   return (
     <div className="p-6">
-
       <div className="bg-white p-4 rounded-xl shadow mb-4">
         <h1 className="text-xl font-bold">{business.name}</h1>
         <p className="text-gray-500">{business.category}</p>
@@ -72,7 +72,6 @@ export default function BusinessDashboard() {
           </h2>
         </div>
       )}
-
     </div>
   );
 }

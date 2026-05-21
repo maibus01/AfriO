@@ -15,7 +15,6 @@
 // import orderRoute from "./routes/OrderRoute";
 // import platformAccountRoutes from "./routes/PlatformAccaountRoute";
 
-
 // dotenv.config();
 
 // const app: Application = express();
@@ -74,7 +73,6 @@
 //   });
 // });
 
-
 import dotenv from "dotenv";
 dotenv.config(); // MUST be first
 
@@ -119,7 +117,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 
 // ======================
@@ -140,6 +138,16 @@ app.use("/api/styles", styleRoutes);
 app.use("/api/tailor-requests", tailorRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/accounts", platformAccountRoutes);
+
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("❌ ERROR:", err);
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Server Error",
+    error: process.env.NODE_ENV === "development" ? err : undefined,
+  });
+});
 
 // ======================
 // HEALTH CHECK

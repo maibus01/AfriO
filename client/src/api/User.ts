@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://afrio-api.onrender.com/api",
+  baseURL: import.meta.env.VITE_API_URL || "https://afrio-api.onrender.com/api",
 });
 // Attach token automatically
 API.interceptors.request.use((req) => {

@@ -15,7 +15,7 @@ export interface IProduct extends Document {
   sold: number;
 
   businessId: mongoose.Types.ObjectId; // vendor business
-  ownerId: mongoose.Types.ObjectId;    // redundancy for fast filtering
+  ownerId: mongoose.Types.ObjectId; // redundancy for fast filtering
 
   isActive: boolean;
 
@@ -28,6 +28,14 @@ export interface IProduct extends Document {
 // =======================
 // SCHEMA
 // =======================
+const imageSchema = new Schema(
+  {
+    url: { type: String, required: true },
+    publicId: { type: String, required: true },
+  },
+  { _id: false },
+);
+
 const ProductSchema = new Schema<IProduct>(
   {
     name: {
@@ -47,10 +55,12 @@ const ProductSchema = new Schema<IProduct>(
       min: 0,
     },
 
-    images: {
-      type: [String],
-      default: [],
-    },
+    images: [imageSchema],
+
+    // images: {
+    //   type: [String],
+    //   default: [],
+    // },
 
     category: {
       type: String,
@@ -87,7 +97,7 @@ const ProductSchema = new Schema<IProduct>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // =======================
@@ -103,7 +113,7 @@ ProductSchema.index({ name: "text" }); // search like Amazon
 // =======================
 ProductSchema.methods.isOwner = function (
   this: IProduct,
-  userId: string
+  userId: string,
 ): boolean {
   return this.ownerId.toString() === userId;
 };
@@ -118,5 +128,7 @@ ProductSchema.pre(/^find/, function (this: Query<any, IProduct>) {
 // =======================
 // MODEL
 // =======================
-export const Product: Model<IProduct> =
-  mongoose.model<IProduct>("Product", ProductSchema);
+export const Product: Model<IProduct> = mongoose.model<IProduct>(
+  "Product",
+  ProductSchema,
+);

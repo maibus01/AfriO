@@ -3,7 +3,8 @@ import axios from "axios";
 import { Package, Plus, Trash2, X } from "lucide-react";
 import MeasurementManager from "../pages/Measurement";
 
-const API = "https://afrio-api.onrender.com/api";
+const API =
+  import.meta.env.VITE_API_URL || "https://afrio-api.onrender.com/api";
 
 // =====================
 // TYPES
@@ -102,7 +103,7 @@ export default function Profile() {
         },
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
       setClosetForm({ name: "", quantity: "" });
@@ -138,10 +139,8 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-orange-50 p-6 space-y-10">
-
       {/* HEADER */}
       <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-2xl flex gap-6 items-center">
-
         {/* PHOTO */}
         <div className="relative">
           <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white/30">
@@ -171,7 +170,9 @@ export default function Profile() {
           <input
             value={user.name}
             onChange={(e) =>
-              setUser((prev) => (prev ? { ...prev, name: e.target.value } : prev))
+              setUser((prev) =>
+                prev ? { ...prev, name: e.target.value } : prev,
+              )
             }
             onBlur={async () => {
               // 💡 Text must be packaged as FormData because backend router forces Multer parsing
@@ -195,7 +196,7 @@ export default function Profile() {
             value={user.phone || ""}
             onChange={(e) =>
               setUser((prev) =>
-                prev ? { ...prev, phone: e.target.value } : prev
+                prev ? { ...prev, phone: e.target.value } : prev,
               )
             }
             onBlur={async () => {
@@ -239,12 +240,13 @@ export default function Profile() {
           <p className="text-gray-400 text-sm">No items yet</p>
         ) : (
           closet.map((c) => (
-            <div key={c._id} className="flex justify-between border p-3 rounded">
+            <div
+              key={c._id}
+              className="flex justify-between border p-3 rounded"
+            >
               <div>
                 <p className="font-semibold">{c.name}</p>
-                <p className="text-xs text-gray-500">
-                  Quantity: {c.quantity}
-                </p>
+                <p className="text-xs text-gray-500">Quantity: {c.quantity}</p>
               </div>
 
               <button onClick={() => deleteCloset(c._id)}>
@@ -259,7 +261,6 @@ export default function Profile() {
       {openAdd === "closet" && (
         <div className="fixed inset-0 bg-black/40 flex justify-center items-center">
           <div className="bg-white p-6 rounded-xl w-96 space-y-3">
-
             <div className="flex justify-between">
               <h2>Add Item</h2>
               <button onClick={() => setOpenAdd(null)}>
