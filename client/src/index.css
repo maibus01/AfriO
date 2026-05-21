@@ -7,3 +7,14 @@
   text-gray-900 dark:text-white
   placeholder-gray-400 dark:placeholder-gray-500;
 }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
