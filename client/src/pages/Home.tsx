@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, Loader2 } from "lucide-react";
+import { Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ButtonBar from "../components/ButtonBar";
 
@@ -28,8 +28,17 @@ export default function HomePage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API}/products`).then((r) => r.json());
-        const rawProducts = response.data || [];
+        const response = await fetch(`${API}/products`);
+        
+        // 1. Safeguard against server errors (404, 500, etc.)
+        if (!response.ok) {
+          throw new Error(`HTTP network error! Status: ${response.status}`);
+        }
+
+        const resData = await response.json();
+        
+        // 2. Safeguard against unexpected formatting/empty payloads
+        const rawProducts = resData?.data || [];
         
         // --- RANDOMIZE PRODUCTS ON LOAD/REFRESH ---
         const randomized = [...rawProducts].sort(() => Math.random() - 0.5);
@@ -37,6 +46,7 @@ export default function HomePage() {
         setProducts(randomized);
       } catch (e) {
         console.error("Home Data Fetch Error:", e);
+        setProducts([]); // Clear state gracefully instead of crashing the UI
       } finally {
         setLoading(false);
       }
@@ -46,7 +56,7 @@ export default function HomePage() {
   }, []);
 
   const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
+    p.name?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -75,9 +85,22 @@ export default function HomePage() {
       <main className="relative flex-grow max-w-7xl w-full mx-auto px-4 pt-4 pb-24 z-10 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <section>
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 space-y-3">
-              <Loader2 className="w-7 h-7 text-amber-500 animate-spin" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">Curating Luxee Collection</p>
+            /* --- PREMIUM LUXURY BRAND SHIMMER SYSTEM LAYOUT --- */
+            <div className="animate-pulse space-y-6">
+              <div className="h-3 w-40 bg-slate-200 dark:bg-neutral-900 rounded-md" />
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 md:gap-5">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                  <div key={i} className="flex flex-col bg-white dark:bg-neutral-900 rounded-xl overflow-hidden border border-slate-100 dark:border-neutral-900/60 p-3 space-y-3.5">
+                    <div className="aspect-square w-full bg-slate-200 dark:bg-neutral-950 rounded-lg" />
+                    <div className="space-y-2">
+                      <div className="h-2 w-1/3 bg-amber-500/10 dark:bg-amber-500/5 rounded" />
+                      <div className="h-3 w-5/6 bg-slate-200 dark:bg-neutral-800 rounded" />
+                      <div className="h-4 w-1/2 bg-slate-300 dark:bg-neutral-800 rounded-md pt-1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 md:gap-5">
@@ -85,12 +108,12 @@ export default function HomePage() {
                 <div 
                   key={p._id} 
                   onClick={() => navigate(`/product/${p._id}`)} 
-                  className="group cursor-pointer flex flex-col h-full bg-white dark:bg-neutral-900 rounded-xl overflow-hidden border border-slate-200/60 dark:border-neutral-800 shadow-sm transition-all duration-300"
+                  className="group cursor-pointer flex flex-col h-full bg-white dark:bg-neutral-900 rounded-xl overflow-hidden border border-slate-200/60 dark:border-neutral-800 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
                 >
                   <div className="aspect-square w-full bg-slate-100 dark:bg-neutral-950 overflow-hidden relative">
                     <img 
-                      src={p.images?.[0]} 
-                      className="w-full h-full object-cover" 
+                      src={p.images?.[0] || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200&auto=format&fit=crop"} 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                       alt={p.name}
                       loading="lazy"
                     />
@@ -103,7 +126,7 @@ export default function HomePage() {
                       {p.name}
                     </p>
                     <p className="text-slate-900 dark:text-white font-black mt-auto text-sm">
-                      ₦{p.price.toLocaleString()}
+                      ₦{p.price ? p.price.toLocaleString() : "0"}
                     </p>
                   </div>
                 </div>
