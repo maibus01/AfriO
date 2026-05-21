@@ -28,6 +28,17 @@ function App() {
   return (
     <CartProvider>
       <Router>
+
+
+        {/* 🔥 GLOBAL LAYOUT WRAPPER */}
+        <div
+          className="min-h-screen flex flex-col bg-white dark:bg-black"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
+        ></div>
+
         <ButtonBar />
         <Routes>
           <Route path="/" element={<HomePage />} />
