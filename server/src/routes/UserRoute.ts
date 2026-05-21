@@ -8,6 +8,7 @@ import {
   deactivateMe,
 } from "../controllers/userController";
 
+import upload from "../middleware/upload";
 import { protect } from "../middleware/authMiddleware";
 
 const router = express.Router();
@@ -20,7 +21,8 @@ router.post("/login", login);
 router.use(protect);
 
 router.get("/me", getMe);
-router.patch("/update-me", updateMe);
+// router.patch("/update-me", updateMe);
+router.patch("/update-me", upload.single("photo"), updateMe);
 router.patch("/update-password", updatePassword);
 router.delete("/deactivate", deactivateMe);
 

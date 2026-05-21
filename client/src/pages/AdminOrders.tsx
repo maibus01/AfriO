@@ -6,7 +6,7 @@ import {
   Truck,
   MessageSquare,
   ExternalLink,
-  Hash
+  MessageCircle, // Added for the Admin-to-Customer WhatsApp trigger
 } from "lucide-react";
 import API from "../api/User";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +26,7 @@ interface Order {
     _id: string;
     name: string;
     email: string;
+    phone?: string; // Optional: Ensure phone is returned from backend if available
   };
   businessId: {
     name: string;
@@ -96,8 +97,33 @@ const AdminOrders = () => {
   };
 
   const handleChatWithCustomer = (customerId: string) => {
-    // Navigates to your existing chat system
     navigate(`/chat/${customerId}`);
+  };
+
+  // ============================================================
+  // NEW: TRIGGER WHATSAPP FROM ADMIN TO CUSTOMER
+  // ============================================================
+  const handleWhatsAppReminder = (order: Order) => {
+    const refNum = order.refNumber || order._id.slice(-6).toUpperCase();
+    
+    // Check if customer has a phone number, fallback to standard business contact line if needed
+    const customerPhone = order.ownerId?.phone || ""; 
+    
+    const rawMessage = `Hello ${order.ownerId?.name || "Customer"},
+
+We noticed you placed an order for *${order.productId?.name}* (Ref: ${refNum}), but we haven't received your transfer confirmation receipt yet.
+
+*Total Amount:* ₦${order.totalPrice.toLocaleString()}
+
+Please reply with your payment receipt here so we can process your package immediately. Thank you!`;
+
+    const message = encodeURIComponent(rawMessage);
+    
+    // Opens chat directly with customer if number exists, or lets admin dispatch it manually
+    window.open(
+      `https://api.whatsapp.com/send?phone=${customerPhone.replace(/\D/g, "")}&text=${message}`,
+      "_blank"
+    );
   };
 
   // ==============================
@@ -154,36 +180,36 @@ const AdminOrders = () => {
             {/* TOP HEADER: ID & PRODUCT */}
             <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-6 mb-8">
 
-  {/* LEFT: IMAGE + INFO */}
-  <div className="flex gap-5 items-start">
-    <img
-      src={order.productId?.images?.[0]}
-      alt="product"
-      className="w-24 h-32 object-cover rounded-2xl border border-slate-100 shadow-sm"
-    />
+              {/* LEFT: IMAGE + INFO */}
+              <div className="flex gap-5 items-start">
+                <img
+                  src={order.productId?.images?.[0]}
+                  alt="product"
+                  className="w-24 h-32 object-cover rounded-2xl border border-slate-100 shadow-sm"
+                />
 
-    <div>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-        Ref: {order.refNumber}
-      </p>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    Ref: {order.refNumber || order._id.slice(-6).toUpperCase()}
+                  </p>
 
-      <h2 className="text-2xl font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
-        {order.productId?.name}
-      </h2>
-    </div>
-  </div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
+                    {order.productId?.name}
+                  </h2>
+                </div>
+              </div>
 
-  {/* RIGHT: DATE */}
-  <div className="flex flex-col items-end">
-    <p className="text-[10px] font-black text-slate-300 uppercase mb-1">
-      Receipt Date
-    </p>
-    <p className="text-xs font-bold text-slate-600">
-      {new Date(order.createdAt).toLocaleString()}
-    </p>
-  </div>
+              {/* RIGHT: DATE */}
+              <div className="flex flex-col items-end">
+                <p className="text-[10px] font-black text-slate-300 uppercase mb-1">
+                  Receipt Date
+                </p>
+                <p className="text-xs font-bold text-slate-600">
+                  {new Date(order.createdAt).toLocaleString()}
+                </p>
+              </div>
 
-</div>
+            </div>
 
             {/* MAIN INFO GRID */}
             <div className="grid md:grid-cols-3 gap-8 mb-8">
@@ -241,7 +267,18 @@ const AdminOrders = () => {
                 </button>
               )}
 
-              {/* SECONDARY ACTION: CHAT */}
+              {/* WHATSAPP REMINDER ACTION (Shows up only if payment is pending) */}
+              {order.internalStatus === "pending_payment" && (
+                <button
+                  onClick={() => handleWhatsAppReminder(order)}
+                  className="bg-green-600 text-white border-2 border-green-600 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-3 hover:bg-green-700 hover:border-green-700 transition-all shadow-lg shadow-green-100"
+                >
+                  <MessageCircle size={16} fill="currentColor" />
+                  WhatsApp Reminder
+                </button>
+              )}
+
+              {/* SECONDARY ACTION: INTERNAL CHAT */}
               <button
                 onClick={() => handleChatWithCustomer(order.ownerId?._id)}
                 className="bg-white text-slate-900 border-2 border-slate-100 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-3 hover:border-slate-900 hover:bg-slate-50 transition-all"
@@ -249,7 +286,7 @@ const AdminOrders = () => {
                 <MessageSquare size={16} />
                 Inquiry Chat
               </button>
-              
+
               <div className="flex-1 text-right">
                  <button className="text-slate-300 hover:text-slate-900 transition-colors">
                     <ExternalLink size={18} />

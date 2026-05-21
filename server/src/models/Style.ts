@@ -6,15 +6,15 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface IStyle extends Document {
   title: string;
   description?: string;
-  image: string;
+  images: string[];
 
   category: "men" | "women" | "kids" | "traditional" | "modern";
 
   businessId: mongoose.Types.ObjectId; // tailor business
   ownerId: mongoose.Types.ObjectId;
 
-    price: number;
-  priceType: "fixed" | "from";
+  // price: number;
+  // priceType: "fixed" | "from";
 
   likes: number;
 
@@ -40,9 +40,13 @@ const StyleSchema = new Schema<IStyle>(
       default: "",
     },
 
-    image: {
-      type: String,
+    images: {
+      type: [String],
       required: true,
+      validate: {
+        validator: (arr: string[]) => arr.length > 0,
+        message: "At least one image is required",
+      },
     },
 
     category: {
@@ -64,17 +68,17 @@ const StyleSchema = new Schema<IStyle>(
     },
 
     // 💰 PRICING
-price: {
-  type: Number,
-  required: true,
-  min: 0,
-},
+    // price: {
+    //   type: Number,
+    //   required: true,
+    //   min: 0,
+    // },
 
-priceType: {
-  type: String,
-  enum: ["fixed", "from"],
-  default: "from",
-},
+    // priceType: {
+    //   type: String,
+    //   enum: ["fixed", "from"],
+    //   default: "from",
+    // },
 
     likes: {
       type: Number,
