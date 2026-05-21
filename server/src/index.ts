@@ -107,15 +107,9 @@ const allowedOrigins = [
   "https://afrio-qfwqx5hyx-mahmuds-projects-5b377daa.vercel.app",
 ];
 
-app.use(
-  cors({
-    origin: "http://localhost:5173", // your frontend
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
+app.use(cors({
+  origin: "*"
+}));
 // ======================
 // MIDDLEWARE
 // ======================
