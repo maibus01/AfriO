@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User";
 import { uploadToCloudinary } from "../utils/cloudinaryUpload";
+import nodemailer from "nodemailer";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -114,56 +115,49 @@ export const login = async (
 // ==========================
 // 🔑 FORGOT PASSWORD
 // ==========================
-export const forgotPassword = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide an email address",
-      });
-    }
-
-    // 1. Check if user exists
     const user = await User.findOne({ email });
 
     if (!user) {
-      // Security tip: Keeping message identical avoids email enumeration attacks
       return res.status(200).json({
         success: true,
         message: "If that email matches an account, a reset link has been sent!",
       });
     }
 
-    // 2. Generate a token (Using short-lived JWT for safety)
     const resetToken = jwt.sign(
       { id: user._id.toString() }, 
       process.env.JWT_SECRET as string, 
-      { expiresIn: "15m" } // Links expire quickly for security
+      { expiresIn: "15m" }
     );
 
-    // 3. Construct your frontend's reset page link 
-    // Example: https://luxeehub.com/reset-password/your_jwt_token
     const origin = req.get("origin") || "http://localhost:5173";
     const resetUrl = `${origin}/reset-password/${resetToken}`;
 
-    // 4. Send the Email
-    try {
-      // TODO: Replace this log with your nodemailer, SendGrid, or Resend code:
-      // await sendEmail({ email: user.email, subject: "Password Reset", body: resetUrl });
-      console.log(`✉️ Password reset link for ${user.email}: ${resetUrl}`);
-      
-    } catch (emailErr) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send reset email. Please try again later.",
-      });
-    }
+    // ✉️ REAL EMAIL CONFIGURATION
+    const transporter = nodemailer.createTransport({
+      service: "gmail", 
+      auth: {
+        user: process.env.EMAIL_USER, // Your email address in .env
+        pass: process.env.EMAIL_PASS, // Your App Password in .env (Not your normal password!)
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"LuxeeHub Support" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: "LuxeeHub - Reset Your Password",
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; max-width: 500px; border: 1px solid #eee;">
+          <h2 style="color: #f59e0b;">LuxeeHub.</h2>
+          <p>You requested a password reset. Click the button below to set a new password. This link expires in 15 minutes.</p>
+          <a href="${resetUrl}" style="background: #030712; color: white; padding: 12px 20px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; margin: 15px 0;">Reset Password</a>
+          <p style="color: #6b7280; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
+        </div>
+      `,
+    });
 
     res.status(200).json({
       success: true,
