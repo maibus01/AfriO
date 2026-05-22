@@ -2,35 +2,34 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Plus, Trash2, Search, Edit3,
-  LayoutGrid, ClipboardList, X,
+  LayoutGrid, ClipboardList, X, Loader2
 } from "lucide-react";
 import BusinessHero from "../components/BusinessHero";
-import SellerOrderManager from "./SellersOrder"; // Your new Order file
+import SellerOrderManager from "./SellersOrder"; 
 
 const API = "https://afrio-api.onrender.com/api";
 
-// Comprehensive list of 20 categories for the UI selection
 const CATEGORIES = [
-  { value: "clothes", label: "Clothing & Apparel (Men & Women)" },
+  { value: "clothes", label: "Clothing & Apparel" },
   { value: "fabric", label: "Fabrics & Textiles" },
   { value: "kids_baby", label: "Kids & Baby Products" },
   { value: "phones_accessories", label: "Phones & Accessories" },
   { value: "electronics", label: "Consumer Electronics" },
   { value: "appliances", label: "Home Appliances" },
-  { value: "furniture", label: "Furniture & Home Decor" },
-  { value: "kitchenware", label: "Kitchenware & Cookware" },
+  { value: "furniture", label: "Furniture & Home" },
+  { value: "kitchenware", label: "Kitchenware" },
   { value: "plumbing", label: "Plumbing & Repairs" },
   { value: "shoes_bags", label: "Shoes & Bags" },
   { value: "cosmetics_beauty", label: "Cosmetics & Beauty" },
-  { value: "groceries", label: "Groceries & Food Items" },
-  { value: "automotive", label: "Automotive & Spare Parts" },
+  { value: "groceries", label: "Groceries & Food" },
+  { value: "automotive", label: "Automotive Parts" },
   { value: "sports_fitness", label: "Sports & Fitness" },
   { value: "health_wellness", label: "Health & Wellness" },
   { value: "books_stationery", label: "Books & Stationery" },
   { value: "jewelry_watches", label: "Jewelry & Watches" },
-  { value: "construction_hardware", label: "Construction & Hardware" },
+  { value: "construction_hardware", label: "Hardware" },
   { value: "services", label: "Professional Services" },
-  { value: "other", label: "Others (Default)" },
+  { value: "other", label: "Others" },
 ];
 
 type Product = {
@@ -51,13 +50,17 @@ export default function VendorDashboard() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [business, setBusiness] = useState<any>(null);
+  
+  // New granular image upload progress states
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const token = localStorage.getItem("token");
 
   const [form, setForm] = useState({
     name: "",
     price: "",
-    category: "clothes", // Defaulted to clothes as it is the first option
+    category: "clothes",
     stock: "",
     description: "",
     images: [] as string[],
@@ -133,36 +136,61 @@ export default function VendorDashboard() {
     }
   };
 
- const updateProduct = async () => {
-  if (!editMode) return;
+  // Safe multi-file uploader context with automated pseudo-percent trackers
+  const handleImagesUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadProgress(10);
 
-  // Destructure to isolate the ID, and group the remaining editable fields
-  const { _id, __v, ...editableFields } = editMode as any;
+    const uploaded: string[] = [];
+    const totalFiles = files.length;
 
-  const payload = {
-    ...editableFields,
-    price: Number(editMode.price), // Enforce number validation type
-    stock: Number(editMode.stock), // Enforce number validation type
+    for (let i = 0; i < totalFiles; i++) {
+      setUploadProgress(Math.round((i / totalFiles) * 100) + 10);
+      const url = await uploadProductImage(files[i]);
+      if (url) uploaded.push(url);
+    }
+
+    setUploadProgress(100);
+    setTimeout(() => {
+      if (editMode) {
+        setEditMode({ ...editMode, images: [...(editMode.images || []), ...uploaded] });
+      } else {
+        setForm({ ...form, images: [...form.images, ...uploaded] });
+      }
+      setUploading(false);
+      setUploadProgress(0);
+    }, 400);
   };
 
-  try {
-    const res = await axios.patch(`${API}/products/${_id}`, payload, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  const updateProduct = async () => {
+    if (!editMode) return;
+    const { _id, __v, ...editableFields } = editMode as any;
 
-    setProducts(prev =>
-      prev.map(p => (p._id === _id ? res.data.data : p))
-    );
+    const payload = {
+      ...editableFields,
+      price: Number(editMode.price), 
+      stock: Number(editMode.stock), 
+    };
 
-    setEditMode(null);
-  } catch (err) {
-    console.error("Update product error:", err);
-    // Add an alert so you can see the specific reason your backend failed
-    if (axios.isAxiosError(err) && err.response) {
-      alert(`Server rejected update: ${err.response.data?.message || err.message}`);
+    try {
+      const res = await axios.patch(`${API}/products/${_id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setProducts(prev =>
+        prev.map(p => (p._id === _id ? res.data.data : p))
+      );
+
+      setEditMode(null);
+    } catch (err) {
+      console.error("Update product error:", err);
+      if (axios.isAxiosError(err) && err.response) {
+        alert(`Server rejected update: ${err.response.data?.message || err.message}`);
+      }
     }
-  }
-};
+  };
+
   const deleteProduct = async (id: string) => {
     if (!window.confirm("Are you sure you want to remove this product from your shop?")) return;
     try {
@@ -175,100 +203,113 @@ export default function VendorDashboard() {
 
   const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
 
-  // Maps the technical value back to a clean UI Label
   const getCategoryLabel = (value: string) => {
     const cat = CATEGORIES.find(c => c.value === value);
     return cat ? cat.label : value;
   };
 
   if (loading) return (
-    <div className="h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+    <div className="w-full min-h-screen bg-white dark:bg-neutral-950 flex flex-col items-center p-4 space-y-6">
+      <div className="w-full max-w-7xl h-36 bg-slate-100 dark:bg-neutral-900 rounded-2xl animate-pulse" />
+      <div className="w-full max-w-7xl grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {[1, 2, 3, 4, 5].map(idx => (
+          <div key={idx} className="h-64 bg-slate-100 dark:bg-neutral-900 rounded-xl animate-pulse" />
+        ))}
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    // pb-24 safeguards layout visibility over your APK custom overlay bottom appbars
+    <div className="min-h-screen bg-white dark:bg-neutral-950 text-slate-900 dark:text-neutral-100 pb-24 md:pb-12">
       {business && <BusinessHero business={business} />}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6">
 
-        {/* --- NAVIGATION TABS --- */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-10">
-          <div className="bg-slate-200/60 p-1.5 rounded-[2rem] flex gap-2 w-full md:w-auto">
+        {/* --- NAVIGATION AND ACTIONS --- */}
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-6">
+          <div className="flex bg-slate-100 dark:bg-neutral-900 p-1 rounded-xl w-full sm:w-auto border border-slate-200/40 dark:border-neutral-800/40">
             <button
               onClick={() => setActiveTab("inventory")}
-              className={`flex-1 md:w-48 flex items-center justify-center gap-2 py-3 rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'inventory' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 sm:w-36 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'inventory' ? 'bg-white text-slate-900 dark:bg-neutral-800 dark:text-white shadow-sm' : 'text-slate-500'}`}
             >
-              <LayoutGrid size={16} /> Inventory
+              <LayoutGrid size={14} /> Inventory
             </button>
             <button
               onClick={() => setActiveTab("orders")}
-              className={`flex-1 md:w-48 flex items-center justify-center gap-2 py-3 rounded-[1.8rem] text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'orders' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 sm:w-36 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'orders' ? 'bg-white text-slate-900 dark:bg-neutral-800 dark:text-white shadow-sm' : 'text-slate-500'}`}
             >
-              <ClipboardList size={16} /> Sales Orders
+              <ClipboardList size={14} /> Sales Orders
             </button>
           </div>
 
           {activeTab === "inventory" && (
             <button
               onClick={() => setOpen(true)}
-              className="w-full md:w-auto bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-2"
+              className="bg-slate-900 text-white dark:bg-white dark:text-black px-4 py-2 rounded-lg text-xs font-bold hover:opacity-90 transition-all flex items-center justify-center gap-1.5 shadow-sm"
             >
-              <Plus size={18} /> Add Product
+              <Plus size={14} /> Add Product
             </button>
           )}
         </div>
 
         {/* --- CONTENT AREA --- */}
         {activeTab === "orders" ? (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="animate-in fade-in duration-200">
             <SellerOrderManager />
           </div>
         ) : (
-          <div className="animate-in fade-in duration-500">
+          <div className="animate-in fade-in duration-200 space-y-4">
             {/* SEARCH BAR */}
-            <div className="relative group max-w-md mb-8">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-600 transition-colors" size={20} />
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 placeholder="Find a product..."
-                className="w-full bg-white border-2 border-slate-100 h-14 pl-12 pr-4 rounded-2xl outline-none focus:border-orange-500 transition-all font-medium"
+                className="w-full bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 h-9 pl-9 pr-4 rounded-lg outline-none focus:border-slate-400 dark:focus:border-neutral-600 transition-all text-xs font-medium"
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
 
-            {/* PRODUCTS GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {/* SMALLER COMPACT PRODUCTS GRID */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
               {filtered.map((p) => (
-                <div key={p._id} className="group bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl transition-all duration-500">
-                  <div className="relative h-56 overflow-hidden">
-                    <img src={p.images?.[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
-                    <div className="absolute top-4 left-4 flex gap-2">
-                      <span className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-slate-900 shadow-sm">
-                        {getCategoryLabel(p.category)}
-                      </span>
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${p.stock > 5 ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                        Qty: {p.stock}
-                      </span>
+                <div key={p._id} className="group bg-white dark:bg-neutral-900 rounded-xl overflow-hidden border border-slate-200/60 dark:border-neutral-800/60 shadow-sm transition-all flex flex-col justify-between">
+                  <div>
+                    {/* Compact Image Window */}
+                    <div className="relative h-36 bg-slate-50 dark:bg-neutral-950 overflow-hidden">
+                      {p.images?.[0] ? (
+                        <img src={p.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-100 dark:bg-neutral-800" />
+                      )}
+                      <div className="absolute top-2 left-2 flex flex-col gap-1 max-w-[90%]">
+                        <span className="bg-slate-900/90 backdrop-blur-md px-2 py-0.5 rounded text-[9px] font-medium text-white tracking-wide truncate inline-block max-w-full">
+                          {getCategoryLabel(p.category)}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wide w-fit ${p.stock > 5 ? 'bg-slate-100 text-slate-800 dark:bg-neutral-800 dark:text-neutral-200' : 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400'}`}>
+                          Qty: {p.stock}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Compact Card Details Layout */}
+                    <div className="p-2.5 space-y-1">
+                      <h2 className="font-bold text-slate-900 dark:text-white text-xs leading-tight line-clamp-1 uppercase">{p.name}</h2>
+                      <p className="text-slate-900 dark:text-white font-mono font-bold text-sm">₦{p.price.toLocaleString()}</p>
+                      <p className="text-slate-500 dark:text-neutral-400 text-[11px] line-clamp-2 min-h-[28px] leading-tight">
+                        {p.description || "No description provided."}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                      <h2 className="font-bold text-slate-900 text-lg leading-tight">{p.name}</h2>
-                      <p className="text-orange-600 font-black text-lg">₦{p.price.toLocaleString()}</p>
-                    </div>
-
-                    <p className="text-slate-500 text-xs line-clamp-2 mb-6 min-h-[32px]">
-                      {p.description || "Premium quality supplies for master artisans."}
-                    </p>
-
-                    <div className="flex gap-2 pt-4 border-t border-slate-50">
-                      <button onClick={() => setEditMode(p)} className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-50 hover:text-blue-600 transition-all">
-                        <Edit3 size={14} /> Edit
+                  {/* Operational Action Panel */}
+                  <div className="p-2.5 pt-0">
+                    <div className="flex gap-1.5 pt-2 border-t border-slate-100 dark:border-neutral-800/50">
+                      <button onClick={() => setEditMode(p)} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-slate-50 dark:bg-neutral-950 text-slate-600 dark:text-neutral-400 rounded-md text-[10px] font-bold hover:bg-slate-100 dark:hover:bg-neutral-800 transition-all border border-slate-100 dark:border-neutral-800/40">
+                        <Edit3 size={11} /> Edit
                       </button>
-                      <button onClick={() => deleteProduct(p._id)} className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-600 transition-all">
-                        <Trash2 size={14} /> Delete
+                      <button onClick={() => deleteProduct(p._id)} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-red-50 dark:bg-red-950/10 text-red-600 dark:text-red-400 rounded-md text-[10px] font-bold hover:bg-red-100 dark:hover:bg-red-950/30 transition-all border border-red-100/40 dark:border-red-900/20">
+                        <Trash2 size={11} /> Del
                       </button>
                     </div>
                   </div>
@@ -281,43 +322,42 @@ export default function VendorDashboard() {
 
       {/* --- MODALS --- */}
       {(open || editMode) && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b flex justify-between items-center">
-              <h2 className="text-2xl font-black text-slate-900">{editMode ? "Edit Product" : "New Product"}</h2>
-              <button onClick={() => { setOpen(false); setEditMode(null); }} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
+        <div className="fixed inset-0 z-[100] bg-black/40 dark:bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-neutral-900 w-full max-w-md rounded-xl overflow-hidden shadow-xl border border-slate-100 dark:border-neutral-800 animate-in zoom-in-95 duration-150">
+            <div className="px-5 py-3.5 border-b border-slate-100 dark:border-neutral-800 flex justify-between items-center">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight">{editMode ? "Modify Product" : "New Listing"}</h2>
+              <button onClick={() => { setOpen(false); setEditMode(null); }} className="p-1 text-slate-400 hover:text-slate-600 rounded-md"><X size={16} /></button>
             </div>
 
-            <div className="p-8 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="p-5 space-y-3.5 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Name</label>
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wide">Title</label>
                   <input
                     value={editMode ? editMode.name : form.name}
-                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 h-9 px-3 rounded-md outline-none text-xs focus:border-slate-400"
                     onChange={(e) => editMode ? setEditMode({ ...editMode, name: e.target.value }) : setForm({ ...form, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Price (₦)</label>
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wide">Price (₦)</label>
                   <input
                     type="number"
                     value={editMode ? editMode.price : form.price}
-                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 h-9 px-3 rounded-md outline-none text-xs focus:border-slate-400"
                     onChange={(e) => editMode ? setEditMode({ ...editMode, price: Number(e.target.value) }) : setForm({ ...form, price: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Category</label>
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wide">Category</label>
                   <select
                     value={editMode ? editMode.category : form.category}
-                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 appearance-none font-medium text-slate-800"
+                    className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 h-9 px-2 rounded-md outline-none text-xs focus:border-slate-400 appearance-none font-medium"
                     onChange={(e) => editMode ? setEditMode({ ...editMode, category: e.target.value }) : setForm({ ...form, category: e.target.value })}
                   >
-                    {/* Dynamic Rendering of all 20 options */}
                     {CATEGORIES.map((cat) => (
                       <option key={cat.value} value={cat.value}>
                         {cat.label}
@@ -326,73 +366,76 @@ export default function VendorDashboard() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Stock Qty</label>
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wide">Stock Count</label>
                   <input
                     type="number"
                     value={editMode ? editMode.stock : form.stock}
-                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 h-9 px-3 rounded-md outline-none text-xs focus:border-slate-400"
                     onChange={(e) => editMode ? setEditMode({ ...editMode, stock: Number(e.target.value) }) : setForm({ ...form, stock: e.target.value })}
                   />
                 </div>
               </div>
 
+              {/* Dynamic Live Media Gallery and Percentage Block */}
               <div className="space-y-1">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
-                    Product Images
-                  </label>
-
+                <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wide">Product Media Assets</label>
+                
+                <label className="w-full flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 text-[11px] text-slate-500 py-3 rounded-lg cursor-pointer font-bold hover:bg-slate-100 dark:hover:bg-neutral-900 transition-colors relative min-h-[50px]">
+                  {uploading ? (
+                    <div className="flex flex-col items-center gap-1.5 w-full px-4">
+                      <div className="flex items-center gap-2 text-slate-700 dark:text-neutral-300">
+                        <Loader2 size={14} className="animate-spin text-slate-900 dark:text-white" />
+                        <span>Uploading Gallery Assets... {uploadProgress}%</span>
+                      </div>
+                      {/* Operational Progress Tracker Bar Container */}
+                      <div className="w-full h-1 bg-slate-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-slate-900 dark:bg-white transition-all duration-300 rounded-full" 
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <span>Click to upload images</span>
+                  )}
                   <input
                     type="file"
                     accept="image/*"
                     multiple
-                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl pt-3"
-                    onChange={async (e) => {
-                      const files = e.target.files;
-                      if (!files) return;
-
-                      const uploaded: string[] = [];
-
-                      for (const file of Array.from(files)) {
-                        const url = await uploadProductImage(file);
-                        if (url) uploaded.push(url);
-                      }
-
-                      if (editMode) {
-                        setEditMode({ ...editMode, images: uploaded });
-                      } else {
-                        setForm({ ...form, images: uploaded });
-                      }
-                    }}
+                    disabled={uploading}
+                    className="hidden"
+                    onChange={(e) => handleImagesUpload(e.target.files)}
                   />
+                </label>
 
-                  <div className="flex gap-2 flex-wrap mt-2">
-                    {(editMode ? editMode.images : form.images).map((img, i) => (
-                      <img
-                        key={i}
-                        src={img}
-                        className="w-14 h-14 rounded-xl object-cover border"
-                        alt=""
-                      />
-                    ))}
-                  </div>
+                <div className="flex gap-1.5 flex-wrap mt-2">
+                  {(editMode ? editMode.images : form.images).map((img, i) => (
+                    <img
+                      key={i}
+                      src={img}
+                      className="w-10 h-10 rounded-md object-cover border border-slate-200 dark:border-neutral-800"
+                      alt=""
+                    />
+                  ))}
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Product Story / Description</label>
+                <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-wide">Description Summary</label>
                 <textarea
                   value={editMode ? editMode.description : form.description}
-                  className="w-full bg-slate-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 h-24"
+                  rows={2}
+                  className="w-full bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 p-2 rounded-md outline-none text-xs focus:border-slate-400 resize-none"
                   onChange={(e) => editMode ? setEditMode({ ...editMode, description: e.target.value }) : setForm({ ...form, description: e.target.value })}
                 />
               </div>
 
               <button
                 onClick={editMode ? updateProduct : createProduct}
-                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-slate-200"
+                disabled={uploading}
+                className="w-full bg-slate-900 text-white dark:bg-white dark:text-black py-2 rounded-md text-xs font-bold shadow-sm hover:opacity-90 transition-all mt-1 disabled:opacity-40"
               >
-                {editMode ? "Save Product Changes" : "Confirm & List Product"}
+                {editMode ? "Save Changes" : "Confirm Listing"}
               </button>
             </div>
           </div>

@@ -231,7 +231,7 @@ export default function AuthPage() {
             )}
 
             {/* FORGOT PASSWORD TRIGGER LINK */}
-            {type === "login" && (
+            {/* {type === "login" && (
               <div className="text-right">
                 <button
                   type="button"
@@ -241,7 +241,7 @@ export default function AuthPage() {
                   Forgot Password?
                 </button>
               </div>
-            )}
+            )} */}
 
             {/* SUBMIT BUTTON */}
             <button

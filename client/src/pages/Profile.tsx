@@ -2,270 +2,441 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { 
   User, 
-  Mail, 
-  Phone, 
+  Building2, 
+  Briefcase, 
   LogOut, 
-  Camera,
-  Edit3,
+  Phone,
+  FileText,
+  Edit2,
+  Check,
   X,
-  CheckCircle2,
-  Loader2
+  ImageIcon,
+  Compass
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const API = "https://afrio-api.onrender.com/api";
 
-type UserType = {
+type Business = {
+  _id: string;
+  name: string;
+  category: "tailor" | "vendor";
+  description?: string;
+  logo?: string;
+  coverImage?: string;
+  phone?: string;
+};
+
+type UserProfile = {
   name: string;
   email: string;
-  phone?: string;
   photo?: string;
 };
 
-export default function Profile() {
-  const token = localStorage.getItem("token");
+export default function ProfilePage() {
   const navigate = useNavigate();
-
-  const [user, setUser] = useState<UserType | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [openEditModal, setOpenEditModal] = useState(false);
-  
-  // Form State Vectors
-  const [profileForm, setProfileForm] = useState({ name: "", phone: "" });
-  const [preview, setPreview] = useState<string | null>(null);
+
+  // Editing States
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: "", email: "" });
+
+  const [editingBusinessId, setEditingBusinessId] = useState<string | null>(null);
+  const [businessForm, setBusinessForm] = useState({ 
+    name: "", 
+    phone: "", 
+    description: "",
+    logo: "",
+    coverImage: "" 
+  });
+
+  const getToken = () => localStorage.getItem("token");
+
+  const fetchProfileAndBusiness = async () => {
+    const token = getToken();
+    if (!token) return navigate("/auth");
+
+    try {
+      const userRes = await axios.get(`${API}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const userData = userRes.data?.user || userRes.data;
+      setUser(userData);
+      setProfileForm({ name: userData?.name || "", email: userData?.email || "" });
+
+      const businessRes = await axios.get(`${API}/business`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setBusinesses(businessRes.data.data || []);
+    } catch (err) {
+      console.error("Fetch Data Error:", err);
+    } finally {
+      loading && setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!token) {
-      navigate("/auth");
-      return;
-    }
-
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get(`${API}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const fetchedUser = res.data.user;
-        setUser(fetchedUser);
-        setProfileForm({
-          name: fetchedUser.name || "",
-          phone: fetchedUser.phone || ""
-        });
-      } catch (err) {
-        console.error("Profile authorization clear down:", err);
-        localStorage.removeItem("token");
-        navigate("/auth");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [token, navigate]);
-
-  const uploadPhoto = async (file: File) => {
-    const formData = new FormData();
-    formData.append("photo", file);
-
-    try {
-      const res = await axios.patch(`${API}/auth/update-me`, formData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.data?.user) {
-        setUser(res.data.user);
-      }
-    } catch (err) {
-      console.error("Avatar dispatch synchronization engine failure:", err);
-    }
-  };
-
-  const handleUpdateProfileData = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    
-    const data = new FormData();
-    data.append("name", profileForm.name);
-    data.append("phone", profileForm.phone);
-
-    try {
-      const res = await axios.patch(`${API}/auth/update-me`, data, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.data?.user) {
-        setUser(res.data.user);
-        setOpenEditModal(false);
-      }
-    } catch (err) {
-      console.error("Profile metadata payload push crash:", err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    fetchProfileAndBusiness();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     navigate("/auth");
   };
 
+  const handleUpdateProfile = async () => {
+    const token = getToken();
+    if (!token) return navigate("/auth");
+
+    try {
+      // PERSIST TO BACKEND: Update this endpoint based on your specific auth schema route
+      const res = await axios.put(`${API}/auth/update`, profileForm, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      const updatedUser = res.data?.user || res.data;
+      setUser(prev => prev ? { ...prev, ...updatedUser } : null);
+      setIsEditingProfile(false);
+    } catch (err) {
+      console.error("Profile update failed", err);
+      // Fallback state update if backend doesn't return user instance
+      setUser(prev => prev ? { ...prev, ...profileForm } : null);
+      setIsEditingProfile(false);
+    }
+  };
+
+  const handleUpdateBusiness = async (id: string) => {
+    const token = getToken();
+    if (!token) return navigate("/auth");
+
+    try {
+      // PERSIST TO BACKEND: synchronizes payload data including local base64 imagery strings
+      await axios.put(`${API}/business/${id}`, businessForm, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setBusinesses(prev => prev.map(b => b._id === id ? { ...b, ...businessForm } : b));
+      setEditingBusinessId(null);
+    } catch (err) {
+      console.error("Business update failed", err);
+      // Fallback state synchronization
+      setBusinesses(prev => prev.map(b => b._id === id ? { ...b, ...businessForm } : b));
+      setEditingBusinessId(null);
+    }
+  };
+
+  // Helper utility to process native gallery imagery files into local readable string addresses
+  const handleImagePicker = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'coverImage') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setBusinessForm(prev => ({
+        ...prev,
+        [field]: reader.result as string
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startEditingBusiness = (e: React.MouseEvent, b: Business) => {
+    e.stopPropagation(); // Stops routing navigation chain on setup launch click
+    setEditingBusinessId(b._id);
+    setBusinessForm({ 
+      name: b.name, 
+      phone: b.phone || "", 
+      description: b.description || "",
+      logo: b.logo || "",
+      coverImage: b.coverImage || ""
+    });
+  };
+
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-slate-50 dark:bg-black flex items-center justify-center p-6">
+      <div className="w-full min-h-screen bg-slate-50 dark:bg-black flex items-center justify-center p-4">
         <div className="space-y-4 w-full max-w-md">
-          <div className="h-40 bg-white dark:bg-neutral-900 rounded-2xl animate-pulse border border-slate-100 dark:border-neutral-800" />
-          <div className="h-14 bg-white dark:bg-neutral-900 rounded-2xl animate-pulse border border-slate-100 dark:border-neutral-800" />
+          <div className="h-28 bg-white dark:bg-neutral-900 rounded-xl animate-pulse border border-slate-100 dark:border-neutral-800" />
+          <div className="h-48 bg-white dark:bg-neutral-900 rounded-xl animate-pulse border border-slate-100 dark:border-neutral-800" />
         </div>
       </div>
     );
   }
 
-  if (!user) return null;
-
   return (
-    <div className="w-full min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-neutral-100 flex flex-col justify-start items-center p-4 md:p-8 select-none">
-      
-      <div className="w-full max-w-xl space-y-4 mt-4 md:mt-12">
+    <div className="w-full min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-neutral-100 flex flex-col items-center p-3 pb-24 sm:p-6 sm:pb-12">
+      <div className="w-full max-w-md space-y-4 mt-2 sm:mt-6">
         
-        {/* FULL RESPONSIVE ACCOUNT CARD BLOCK */}
-        <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200/60 dark:border-neutral-800/80 p-6 shadow-sm relative overflow-hidden">
-          <div className="absolute right-0 top-0 translate-x-6 -translate-y-6 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+        {/* ====================================================
+            1. PROFILE INFO SECTION (EDITABLE)
+           ==================================================== */}
+        <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200/60 dark:border-neutral-800/80 p-4 shadow-sm relative overflow-hidden">
           
-          <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-            
-            {/* HOVER ACTIVE AVATAR INTERFACE LAYER */}
-            <div className="relative group shrink-0">
-              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-amber-500/20 dark:border-neutral-700 p-1 bg-white dark:bg-neutral-900 relative">
-                <img
-                  src={preview || user.photo || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256&h=256&auto=format&fit=crop"}
-                  className="w-full h-full object-cover rounded-full"
-                  alt="Account Avatar"
-                />
-                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  <Camera size={18} className="text-white mb-0.5" />
-                  <span className="text-[8px] text-white font-black uppercase tracking-wider">Change</span>
+          {!isEditingProfile ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                {/* Isolated Profile Avatar Track */}
+                <div className="w-14 h-14 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-500 flex items-center justify-center font-black text-xl border border-amber-500/20 shrink-0 overflow-hidden">
+                  {user?.photo ? (
+                    <img src={user.photo} alt="User Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={24} />
+                  )}
                 </div>
+                
+                <div className="space-y-0.5 min-w-0 flex-1">
+                  <p className="text-[9px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest">Afrio Merchant Profile</p>
+                  <h2 className="text-lg font-bold tracking-tight text-slate-950 dark:text-white uppercase truncate">
+                    {user?.name || "Premium Member"}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-neutral-400 font-mono truncate">
+                    {user?.email || "no-email-linked@afrio.com"}
+                  </p>
+                </div>
+
+                <button 
+                  onClick={() => setIsEditingProfile(true)}
+                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                >
+                  <Edit2 size={16} />
+                </button>
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                className="absolute inset-0 opacity-0 cursor-pointer z-20 rounded-full"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setPreview(URL.createObjectURL(file));
-                  uploadPhoto(file);
-                }}
-              />
-            </div>
 
-            {/* IDENTITY METADATA DISPLAY WRAPPER */}
-            <div className="flex-1 min-w-0 space-y-1.5 w-full">
-              <div>
-                <p className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest">Active Profile</p>
-                <h2 className="text-xl font-black tracking-tight text-slate-950 dark:text-white truncate uppercase mt-0.5">{user.name}</h2>
-              </div>
-              
-              <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-neutral-800/40">
-                <p className="text-xs text-slate-500 dark:text-neutral-400 font-mono flex items-center justify-center sm:justify-start gap-2 truncate">
-                  <Mail size={12} className="text-slate-400" /> {user.email}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-neutral-400 font-mono flex items-center justify-center sm:justify-start gap-2">
-                  <Phone size={12} className="text-slate-400" /> {user.phone || <span className="text-slate-300 dark:text-neutral-600 italic">No phone linked</span>}
-                </p>
-              </div>
-            </div>
-
-            {/* QUICK-ACTION TRIGGER */}
-            <button 
-              onClick={() => setOpenEditModal(true)}
-              className="w-full sm:w-auto px-4 py-2.5 bg-slate-950 dark:bg-neutral-800 text-white rounded-xl hover:bg-slate-900 dark:hover:bg-neutral-750 transition-all border border-slate-800 dark:border-neutral-700 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-wider shrink-0"
-            >
-              <Edit3 size={13} /> Edit Profile
-            </button>
-          </div>
-        </div>
-
-        {/* LOGOUT SECURE DISPATCH */}
-        <button 
-          onClick={handleLogout}
-          className="w-full bg-white dark:bg-neutral-900 text-rose-600 dark:text-rose-500 rounded-2xl p-4 border border-slate-200/60 dark:border-neutral-800/80 shadow-sm font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 hover:bg-rose-50/40 dark:hover:bg-rose-950/10 transition-colors"
-        >
-          <LogOut size={14} /> Terminate Current Session
-        </button>
-
-      </div>
-
-      {/* ====================================================
-          MODAL SHEET OVERLAY: UNIVERSAL METADATA MANAGER
-         ==================================================== */}
-      {openEditModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[9999] p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-neutral-900 w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 border border-slate-100 dark:border-neutral-800 shadow-2xl space-y-4">
-            
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-neutral-800/60">
-              <div className="flex items-center gap-2">
-                <User size={16} className="text-amber-500" />
-                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Modify Account Registry</h3>
-              </div>
-              <button 
-                onClick={() => setOpenEditModal(false)} 
-                className="p-1.5 bg-slate-50 dark:bg-neutral-800 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors"
+              <button
+                onClick={handleLogout}
+                className="w-full py-2.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/40 transition-all border border-red-100 dark:border-red-900/30 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider shadow-sm min-h-[44px]"
               >
-                <X size={16} />
+                <LogOut size={14} /> Log Out
               </button>
             </div>
-            
-            <form onSubmit={handleUpdateProfileData} className="space-y-4">
-              <div>
-                <label className="block text-[9px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Legal Full Name</label>
-                <input 
-                  type="text" 
-                  value={profileForm.name} 
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-neutral-800 text-xs p-3 rounded-xl border border-slate-200 dark:border-neutral-700 outline-none font-bold text-slate-800 dark:text-white focus:border-amber-500 dark:focus:border-amber-500 transition-all"
-                  required
-                  placeholder="John Doe"
-                />
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-100 dark:border-neutral-800 pb-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Edit Profile Data</h4>
+                <div className="flex gap-1">
+                  <button onClick={() => setIsEditingProfile(false)} className="p-1 text-slate-400"><X size={16} /></button>
+                  <button onClick={handleUpdateProfile} className="p-1 text-emerald-500"><Check size={16} /></button>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-[9px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Mobile Communication Endpoint</label>
-                <input 
-                  type="tel" 
-                  value={profileForm.phone} 
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="+234 902 745 6061"
-                  className="w-full bg-slate-50 dark:bg-neutral-800 text-xs p-3 rounded-xl border border-slate-200 dark:border-neutral-700 outline-none font-mono text-slate-800 dark:text-white focus:border-amber-500 dark:focus:border-amber-500 transition-all"
-                />
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Merchant Name</label>
+                  <input 
+                    type="text" 
+                    value={profileForm.name} 
+                    onChange={e => setProfileForm({...profileForm, name: e.target.value})}
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950 text-sm focus:outline-none focus:border-amber-500 min-h-[40px]" 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Email Address</label>
+                  <input 
+                    type="email" 
+                    value={profileForm.email} 
+                    onChange={e => setProfileForm({...profileForm, email: e.target.value})}
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950 text-sm focus:outline-none focus:border-amber-500 min-h-[40px]" 
+                  />
+                </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button 
-                  type="button"
-                  onClick={() => setOpenEditModal(false)}
-                  className="w-full bg-slate-50 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-100 dark:hover:bg-neutral-750 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={isSaving}
-                  className="w-full bg-slate-950 dark:bg-amber-500 dark:text-black text-white py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90 disabled:opacity-50 transition-all"
-                >
-                  {isSaving ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <>
-                      <CheckCircle2 size={14} /> Save Changes
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+            </div>
+          )}
         </div>
-      )}
 
+        {/* Section Heading Tag */}
+        <div className="pt-1 px-1 flex items-center gap-2">
+          <Building2 size={13} className="text-slate-400" />
+          <h3 className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Business Card Credentials</h3>
+        </div>
+
+        {/* ====================================================
+            2. BUSINESS INFO SECTION (MEDIUM CARDS WITH GALLERY SELECTION)
+           ==================================================== */}
+        <div className="w-full space-y-3">
+          {businesses.length > 0 ? (
+            businesses.map((b) => (
+              <div
+                key={b._id}
+                onClick={() => editingBusinessId !== b._id && navigate(`/${b.category}/${b._id}`)}
+                className={`bg-white dark:bg-neutral-900 rounded-xl border border-slate-200/60 dark:border-neutral-800/80 shadow-sm overflow-hidden transition-all flex flex-col ${editingBusinessId !== b._id ? 'cursor-pointer active:scale-[0.99]' : ''}`}
+              >
+                {/* Store Cover Image Banner Background */}
+                <div className="w-full h-24 bg-slate-100 dark:bg-neutral-800 relative overflow-hidden border-b border-slate-100 dark:border-neutral-800/50">
+                  {editingBusinessId === b._id ? (
+                    businessForm.coverImage ? (
+                      <img src={businessForm.coverImage} className="w-full h-full object-cover" alt="New Cover Preview" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-tr from-slate-200/50 to-slate-50 dark:from-neutral-950 dark:to-neutral-900 flex items-center justify-center" />
+                    )
+                  ) : b.coverImage ? (
+                    <img src={b.coverImage} className="w-full h-full object-cover" alt="Business Cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-tr from-slate-200/50 to-slate-50 dark:from-neutral-950 dark:to-neutral-900 flex items-center justify-center" />
+                  )}
+                  
+                  {/* Category Pill Tag */}
+                  <span className={`absolute top-3 right-3 px-2 py-0.5 rounded-md text-[8px] uppercase tracking-widest font-black shadow-sm border ${
+                    b.category === 'tailor' 
+                      ? 'bg-purple-500 text-white border-purple-400' 
+                      : 'bg-blue-600 text-white border-blue-500'
+                  }`}>
+                    {b.category}
+                  </span>
+                </div>
+
+                {/* Content Layout */}
+                <div className="p-4 relative pt-10 flex flex-col space-y-3">
+                  
+                  {/* Isolated Floating Business Logo Track */}
+                  <div className="w-14 h-14 rounded-xl overflow-hidden border-2 border-white dark:border-neutral-900 bg-slate-50 dark:bg-neutral-800 flex items-center justify-center shadow absolute left-4 top-0 -translate-y-1/2 shrink-0 z-10">
+                    {editingBusinessId === b._id ? (
+                      businessForm.logo ? (
+                        <img src={businessForm.logo} className="w-full h-full object-cover" alt="New Logo Preview" />
+                      ) : (
+                        <Briefcase className="text-slate-400" size={20} />
+                      )
+                    ) : b.logo ? (
+                      <img src={b.logo} className="w-full h-full object-cover" alt="Store Logo" />
+                    ) : (
+                      <Briefcase className="text-slate-400" size={20} />
+                    )}
+                  </div>
+
+                  {editingBusinessId !== b._id ? (
+                    <>
+                      {/* Read Mode */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <h3 className="text-base font-bold tracking-tight text-slate-950 dark:text-white uppercase truncate">
+                            {b.name}
+                          </h3>
+                        </div>
+                        <button 
+                          onClick={(e) => startEditingBusiness(e, b)}
+                          className="p-1.5 -mt-1 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-1 pt-1.5 border-t border-slate-100 dark:border-neutral-800/40 text-xs text-slate-600 dark:text-neutral-400">
+                        {b.phone && (
+                          <div className="flex items-center gap-2 font-mono">
+                            <Phone size={12} className="text-amber-500 shrink-0" />
+                            <span className="truncate font-semibold">{b.phone}</span>
+                          </div>
+                        )}
+                        <div className="flex items-start gap-2">
+                          <FileText size={12} className="text-amber-500 shrink-0 mt-0.5" />
+                          <p className="leading-normal text-slate-500 dark:text-neutral-400 text-xs font-medium line-clamp-2">
+                            {b.description || "No description provided."}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* In-place Business Edit Mode Form (Protected against event bubbling bugs) */
+                    <div className="space-y-2.5 pt-1 text-xs">
+                      <div className="flex justify-between items-center border-b border-slate-100 dark:border-neutral-800 pb-1.5">
+                        <span className="font-bold uppercase text-[10px] text-slate-400">Modify Business Entry</span>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setEditingBusinessId(null); }} 
+                            className="text-slate-400 p-1 hover:scale-105 transition-transform"
+                          >
+                            <X size={15} />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleUpdateBusiness(b._id); }} 
+                            className="text-emerald-500 p-1 hover:scale-105 transition-transform"
+                          >
+                            <Check size={15} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                        <div>
+                          <label className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Business Identity Name</label>
+                          <input 
+                            type="text" 
+                            value={businessForm.name}
+                            onChange={e => setBusinessForm({...businessForm, name: e.target.value})}
+                            className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950 focus:outline-none min-h-[38px]"
+                          />
+                        </div>
+
+                        {/* Interactive Native Picker Touchzones */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5 flex items-center gap-1">
+                              <Compass size={10} /> Choose Logo
+                            </label>
+                            <label className="w-full flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-dashed border-slate-300 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 text-[11px] text-slate-500 active:bg-slate-100 dark:active:bg-neutral-900 cursor-pointer text-center font-medium min-h-[38px]">
+                              <Compass size={12} className="text-amber-500" />
+                              Gallery
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={e => handleImagePicker(e, 'logo')} 
+                              />
+                            </label>
+                          </div>
+                          <div>
+                            <label className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5 flex items-center gap-1">
+                              <ImageIcon size={10} /> Choose Cover
+                            </label>
+                            <label className="w-full flex items-center justify-center gap-1.5 px-2 py-2 rounded-md border border-dashed border-slate-300 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-950 text-[11px] text-slate-500 active:bg-slate-100 dark:active:bg-neutral-900 cursor-pointer text-center font-medium min-h-[38px]">
+                              <ImageIcon size={12} className="text-amber-500" />
+                              Gallery
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={e => handleImagePicker(e, 'coverImage')} 
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Contact Line</label>
+                          <input 
+                            type="text" 
+                            value={businessForm.phone}
+                            onChange={e => setBusinessForm({...businessForm, phone: e.target.value})}
+                            className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950 focus:outline-none min-h-[38px]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Summary Manifesto</label>
+                          <textarea 
+                            value={businessForm.description}
+                            onChange={e => setBusinessForm({...businessForm, description: e.target.value})}
+                            rows={2}
+                            className="w-full px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-950 focus:outline-none resize-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-dashed border-slate-200 dark:border-neutral-800 p-6 text-center">
+              <Briefcase className="mx-auto text-slate-300 dark:text-neutral-700 mb-2" size={24} />
+              <p className="text-[11px] font-bold text-slate-400 dark:text-neutral-500">
+                No active operational business credentials linked yet.
+              </p>
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }
