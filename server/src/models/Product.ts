@@ -9,7 +9,27 @@ export interface IProduct extends Document {
   price: number;
   images: string[];
 
-  category: "fabric" | "shoes" | "caps" | "machines" | "other";
+  category:
+  | "clothes"
+  | "fabric"
+  | "kids_baby"
+  | "phones_accessories"
+  | "electronics"
+  | "appliances"
+  | "furniture"
+  | "kitchenware"
+  | "plumbing"
+  | "shoes_bags"
+  | "cosmetics_beauty"
+  | "groceries"
+  | "automotive"
+  | "sports_fitness"
+  | "health_wellness"
+  | "books_stationery"
+  | "jewelry_watches"
+  | "construction_hardware"
+  | "services"
+  | "other";
 
   stock: number;
   sold: number;
@@ -54,8 +74,15 @@ const ProductSchema = new Schema<IProduct>(
 
     category: {
       type: String,
-      enum: ["fabric", "shoes", "caps", "machines", "other"],
-      required: true,
+      enum: [
+        "clothes", "fabric", "kids_baby", "phones_accessories", "electronics",
+        "appliances", "furniture", "kitchenware", "plumbing", "shoes_bags",
+        "cosmetics_beauty", "groceries", "automotive", "sports_fitness",
+        "health_wellness", "books_stationery", "jewelry_watches",
+        "construction_hardware", "services", "other"
+      ],
+      default: "other",
+      required: true
     },
 
     stock: {

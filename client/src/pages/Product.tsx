@@ -9,6 +9,30 @@ import SellerOrderManager from "./SellersOrder"; // Your new Order file
 
 const API = "https://afrio-api.onrender.com/api";
 
+// Comprehensive list of 20 categories for the UI selection
+const CATEGORIES = [
+  { value: "clothes", label: "Clothing & Apparel (Men & Women)" },
+  { value: "fabric", label: "Fabrics & Textiles" },
+  { value: "kids_baby", label: "Kids & Baby Products" },
+  { value: "phones_accessories", label: "Phones & Accessories" },
+  { value: "electronics", label: "Consumer Electronics" },
+  { value: "appliances", label: "Home Appliances" },
+  { value: "furniture", label: "Furniture & Home Decor" },
+  { value: "kitchenware", label: "Kitchenware & Cookware" },
+  { value: "plumbing", label: "Plumbing & Repairs" },
+  { value: "shoes_bags", label: "Shoes & Bags" },
+  { value: "cosmetics_beauty", label: "Cosmetics & Beauty" },
+  { value: "groceries", label: "Groceries & Food Items" },
+  { value: "automotive", label: "Automotive & Spare Parts" },
+  { value: "sports_fitness", label: "Sports & Fitness" },
+  { value: "health_wellness", label: "Health & Wellness" },
+  { value: "books_stationery", label: "Books & Stationery" },
+  { value: "jewelry_watches", label: "Jewelry & Watches" },
+  { value: "construction_hardware", label: "Construction & Hardware" },
+  { value: "services", label: "Professional Services" },
+  { value: "other", label: "Others (Default)" },
+];
+
 type Product = {
   _id: string;
   name: string;
@@ -33,7 +57,7 @@ export default function VendorDashboard() {
   const [form, setForm] = useState({
     name: "",
     price: "",
-    category: "fabric",
+    category: "clothes", // Defaulted to clothes as it is the first option
     stock: "",
     description: "",
     images: [] as string[],
@@ -66,7 +90,7 @@ export default function VendorDashboard() {
       ...form,
       price: Number(form.price),
       stock: Number(form.stock),
-      images: form.images, // already array of uploaded URLs
+      images: form.images, 
       businessId: business._id,
     };
 
@@ -77,18 +101,17 @@ export default function VendorDashboard() {
 
       setProducts((prev) => [res.data.data, ...prev]);
 
-      // ✅ FIXED RESET (IMPORTANT)
       setOpen(false);
       setForm({
         name: "",
         price: "",
-        category: "fabric",
+        category: "clothes",
         stock: "",
         description: "",
-        images: [], // ✅ must be array, not string
+        images: [], 
       });
     } catch (err) {
-      console.log(err);
+      console.error("Create product error:", err);
     }
   };
 
@@ -103,40 +126,60 @@ export default function VendorDashboard() {
         },
       });
 
-      return res.data?.user?.photo; // same response pattern you used
+      return res.data?.user?.photo; 
     } catch (err) {
       console.error("UPLOAD ERROR:", err);
       return null;
     }
   };
 
-  const updateProduct = async () => {
-    if (!editMode) return;
+ const updateProduct = async () => {
+  if (!editMode) return;
 
-    const payload = {
-      ...editMode,
-    };
+  // Destructure to isolate the ID, and group the remaining editable fields
+  const { _id, __v, ...editableFields } = editMode as any;
 
-    const res = await axios.patch(`${API}/products/${editMode._id}`, payload, {
+  const payload = {
+    ...editableFields,
+    price: Number(editMode.price), // Enforce number validation type
+    stock: Number(editMode.stock), // Enforce number validation type
+  };
+
+  try {
+    const res = await axios.patch(`${API}/products/${_id}`, payload, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     setProducts(prev =>
-      prev.map(p => (p._id === editMode._id ? res.data.data : p))
+      prev.map(p => (p._id === _id ? res.data.data : p))
     );
 
     setEditMode(null);
-  };
-
+  } catch (err) {
+    console.error("Update product error:", err);
+    // Add an alert so you can see the specific reason your backend failed
+    if (axios.isAxiosError(err) && err.response) {
+      alert(`Server rejected update: ${err.response.data?.message || err.message}`);
+    }
+  }
+};
   const deleteProduct = async (id: string) => {
-    if (!window.confirm("Remove this product from your shop?")) return;
+    if (!window.confirm("Are you sure you want to remove this product from your shop?")) return;
     try {
       await axios.delete(`${API}/products/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       setProducts(prev => prev.filter(p => p._id !== id));
-    } catch (err) { console.log(err); }
+    } catch (err) { 
+      console.error("Delete product error:", err); 
+    }
   };
 
   const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  // Maps the technical value back to a clean UI Label
+  const getCategoryLabel = (value: string) => {
+    const cat = CATEGORIES.find(c => c.value === value);
+    return cat ? cat.label : value;
+  };
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -202,7 +245,7 @@ export default function VendorDashboard() {
                     <img src={p.images?.[0]} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
                     <div className="absolute top-4 left-4 flex gap-2">
                       <span className="bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest text-slate-900 shadow-sm">
-                        {p.category}
+                        {getCategoryLabel(p.category)}
                       </span>
                       <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm ${p.stock > 5 ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                         Qty: {p.stock}
@@ -270,13 +313,16 @@ export default function VendorDashboard() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Category</label>
                   <select
-                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 appearance-none"
+                    value={editMode ? editMode.category : form.category}
+                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 appearance-none font-medium text-slate-800"
                     onChange={(e) => editMode ? setEditMode({ ...editMode, category: e.target.value }) : setForm({ ...form, category: e.target.value })}
                   >
-                    <option value="fabric">Fabric</option>
-                    <option value="shoes">Shoes</option>
-                    <option value="caps">Caps</option>
-                    <option value="machines">Machines</option>
+                    {/* Dynamic Rendering of all 20 options */}
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -291,7 +337,6 @@ export default function VendorDashboard() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Image Link(s)</label>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
                     Product Images
@@ -301,7 +346,7 @@ export default function VendorDashboard() {
                     type="file"
                     accept="image/*"
                     multiple
-                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl"
+                    className="w-full bg-slate-50 border-none h-14 px-5 rounded-2xl pt-3"
                     onChange={async (e) => {
                       const files = e.target.files;
                       if (!files) return;
@@ -321,13 +366,13 @@ export default function VendorDashboard() {
                     }}
                   />
 
-                  {/* preview like your BusinessPage */}
                   <div className="flex gap-2 flex-wrap mt-2">
                     {(editMode ? editMode.images : form.images).map((img, i) => (
                       <img
                         key={i}
                         src={img}
                         className="w-14 h-14 rounded-xl object-cover border"
+                        alt=""
                       />
                     ))}
                   </div>
@@ -335,7 +380,7 @@ export default function VendorDashboard() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Product Story</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Product Story / Description</label>
                 <textarea
                   value={editMode ? editMode.description : form.description}
                   className="w-full bg-slate-50 border-none p-5 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 h-24"
