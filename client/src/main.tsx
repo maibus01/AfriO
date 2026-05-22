@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { CartProvider } from "./context/CartContext";
 import './index.css'
 import App from './App.tsx'
 import { App as CapApp } from '@capacitor/app'
@@ -18,6 +19,9 @@ CapApp.addListener('backButton', () => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <CartProvider>
+      <App />
+    </CartProvider>
+    
   </StrictMode>,
 )

@@ -22,6 +22,7 @@ import RequestPaymentPage from "./pages/RequestPaymentPage";
 
 import OrderHub from "./pages/OrderHub";
 import Shops from "./pages/Shops";
+import Category from "./pages/Category";
 
 
 function App() {
@@ -52,6 +53,7 @@ function App() {
 <Route path="/orders-hub" element={<OrderHub />} />
 
 <Route path="/shop" element={<Shops />} />
+<Route path="/category" element={<Category />} />
 
           <Route path="/chat" element={<ChatPage />} />
 

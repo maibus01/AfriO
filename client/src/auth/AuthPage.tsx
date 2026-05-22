@@ -78,7 +78,7 @@ export default function AuthPage() {
         <div className="p-6 text-center border-b dark:border-gray-800">
           {/* Text branding color conversion to signature amber color */}
           <h1 className="text-2xl font-black text-amber-500 tracking-tight uppercase">
-            LuxxeHub<span className="text-gray-900 dark:text-white">.</span>
+            LuxeeHub<span className="text-gray-900 dark:text-white">.</span>
           </h1>
           <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-wide">
             Shop fabrics, tailor styles, anywhere in the world 🌍
