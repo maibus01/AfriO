@@ -7,6 +7,11 @@ const API = axios.create({
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
 
+  // 🔑 FIX: Do not attach authorization headers if calling the public recovery route
+  if (req.url && req.url.includes("/auth/forgot-password")) {
+    return req; 
+  }
+
   if (token) {
     req.headers.Authorization = `Bearer ${token}`;
   }

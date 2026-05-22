@@ -123,6 +123,7 @@ export const forgotPassword = async (
   try {
     const { email } = req.body;
 
+    // 1. Basic validation
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -132,75 +133,79 @@ export const forgotPassword = async (
 
     const user = await User.findOne({ email });
 
-    // Always respond the same (security best practice)
+    // 2. Security Best Practice: Don't let hackers know if an email exists or not
     if (!user) {
       return res.status(200).json({
         success: true,
-        message:
-          "If that email matches an account, a reset link has been sent!",
+        message: "If that email matches an account, a reset link has been sent!",
       });
     }
 
+    // 3. Environmental checks
     if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is not defined");
+      throw new Error("JWT_SECRET is missing from environment variables");
     }
 
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      throw new Error("EMAIL_USER or EMAIL_PASS configuration is missing");
+    }
+
+    // 4. Generate a secure, short-lived token (15 minutes)
     const resetToken = jwt.sign(
       { id: user._id.toString() },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
 
-    // IMPORTANT: use frontend URL, not request origin
-    const FRONTEND_URL =
-      process.env.FRONTEND_URL || "http://localhost:5173";
-
+    // 5. Build the landing link pointing to your frontend domain setup
+    const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
     const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
 
-    // safer email check
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      throw new Error("Email credentials are not set");
-    }
-
+    // 6. Define the transport configuration optimized for cloud hosts like Render
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
+      service: "gmail",
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        pass: process.env.EMAIL_PASS, // Your 16-character Google App Password
       },
     });
 
-    // ❌ REMOVE verify() in production (it often breaks on Render)
-    // await transporter.verify();
-
+    // 7. Dispatch the secure payload email
     await transporter.sendMail({
       from: `"LuxeeHub Support" <${process.env.EMAIL_USER}>`,
       to: user.email,
-      subject: "Reset Your Password",
+      subject: "Reset Your Password - LuxeeHub",
       html: `
-        <div style="font-family:sans-serif;padding:20px;">
-          <h2 style="color:#f59e0b;">LuxeeHub</h2>
-          <p>Click below to reset your password:</p>
-          <a href="${resetUrl}" 
-             style="background:#000;color:#fff;padding:10px 15px;border-radius:6px;text-decoration:none;">
-             Reset Password
-          </a>
-          <p style="font-size:12px;color:gray;">
-            This link expires in 15 minutes
+        <div style="font-family: sans-serif; padding: 30px; max-width: 500px; margin: 0 auto; border: 1px solid #f3f4f6; border-radius: 16px;">
+          <h2 style="color: #f59e0b; margin-bottom: 4px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em;">LuxeeHub<span style="color: #111827;">.</span></h2>
+          <p style="font-size: 11px; font-weight: bold; color: #9ca3af; text-transform: uppercase; margin-top: 0; margin-bottom: 24px; letter-spacing: 0.05em;">Account Recovery</p>
+          
+          <p style="color: #374151; font-size: 14px; line-height: 1.6;">You requested a password reset for your account. Click the button below to secure a new password:</p>
+          
+          <div style="margin: 24px 0;">
+            <a href="${resetUrl}" 
+               style="background: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-size: 13px; font-weight: bold; display: inline-block; text-transform: uppercase; letter-spacing: 0.05em;">
+               Reset Password
+            </a>
+          </div>
+          
+          <p style="font-size: 11px; color: #ef4444; font-weight: bold; margin-top: 20px;">
+            ⚠️ This secure access link will automatically expire in 15 minutes.
           </p>
+          <hr style="border: 0; border-top: 1px solid #f3f4f6; margin: 20px 0;" />
+          <p style="font-size: 11px; color: #9ca3af; line-height: 1.4;">If you did not make this request, you can safely ignore this email. Your current security settings remain completely safe.</p>
         </div>
       `,
     });
 
+    // 8. Return success response matches step 2 perfectly
     return res.status(200).json({
       success: true,
-      message:
-        "If that email matches an account, a reset link has been sent!",
+      message: "If that email matches an account, a reset link has been sent!",
     });
+
   } catch (err) {
-    console.error("FORGOT PASSWORD ERROR:", err);
+    console.error("FORGOT PASSWORD CONTROLLER CRASH:", err);
     next(err);
   }
 };

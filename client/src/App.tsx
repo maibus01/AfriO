@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import ButtonBar from "./components/ButtonBar";
 import HomePage from "./pages/Home";
 import AuthPage from "./auth/AuthPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { CartProvider } from "./context/CartContext";
 import { AuthProvider } from "./context/AuthContext";
 import CartPage from "./pages/CartPage";
@@ -36,6 +37,7 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/business" element={<Business />} />
