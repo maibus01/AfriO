@@ -3,6 +3,7 @@ import ButtonBar from "./components/ButtonBar";
 import HomePage from "./pages/Home";
 import AuthPage from "./auth/AuthPage";
 import { CartProvider } from "./context/CartContext";
+import { AuthProvider } from "./context/AuthContext";
 import CartPage from "./pages/CartPage";
 import Profile from "./pages/Profile";
 import Business from "./pages/Business";
@@ -27,50 +28,53 @@ import Category from "./pages/Category";
 
 function App() {
   return (
-    <CartProvider>
-      <Router>
-        <ButtonBar />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/business" element={<Business />} />
-          <Route path="/admin" element={<Admin />} />
-          {/* <Route path="/business/dashboard" element={<BusinessDashboard />} /> */}
-          {/* 🏪 VENDOR DASHBOARD */}
-          <Route path="/vendor/:id" element={<Product />} />
-          <Route path="/tailor/:id" element={<Style />} />
+    <AuthProvider>
 
-          <Route path="/product/:id" element={<ProductDetails />} />
-          <Route path="/style/:id" element={<StyleDetails />} />
+      <CartProvider>
+        <Router>
+          <ButtonBar />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/business" element={<Business />} />
+            <Route path="/admin" element={<Admin />} />
+            {/* <Route path="/business/dashboard" element={<BusinessDashboard />} /> */}
+            {/* 🏪 VENDOR DASHBOARD */}
+            <Route path="/vendor/:id" element={<Product />} />
+            <Route path="/tailor/:id" element={<Style />} />
 
-          <Route
-            path="/dashboard/business/:id"
-            element={<BusinessDashboard />}
-          />
+            <Route path="/product/:id" element={<ProductDetails />} />
+            <Route path="/style/:id" element={<StyleDetails />} />
 
-<Route path="/orders-hub" element={<OrderHub />} />
+            <Route
+              path="/dashboard/business/:id"
+              element={<BusinessDashboard />}
+            />
 
-<Route path="/shop" element={<Shops />} />
-<Route path="/category" element={<Category />} />
+            <Route path="/orders-hub" element={<OrderHub />} />
 
-          <Route path="/chat" element={<ChatPage />} />
+            <Route path="/shop" element={<Shops />} />
+            <Route path="/category" element={<Category />} />
 
-
-          <Route path="/business/:businessId/public" element={<PublicSeller />} />
-
-          <Route path="/order" element={<OrderPage />} />
-          <Route path="/admin/accounts" element={<AdminAccounts />} />
+            <Route path="/chat" element={<ChatPage />} />
 
 
-          <Route path="/admin/orders" element={<AdminOrders />} />
-          <Route path="/admin/styles-request" element={<AdminRequests />} />
-          <Route path="/request-payment" element={<RequestPaymentPage />} />
+            <Route path="/business/:businessId/public" element={<PublicSeller />} />
 
-        </Routes>
-      </Router>
-    </CartProvider>
+            <Route path="/order" element={<OrderPage />} />
+            <Route path="/admin/accounts" element={<AdminAccounts />} />
+
+
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/styles-request" element={<AdminRequests />} />
+            <Route path="/request-payment" element={<RequestPaymentPage />} />
+
+          </Routes>
+        </Router>
+      </CartProvider>
+    </AuthProvider>
   );
 }
 

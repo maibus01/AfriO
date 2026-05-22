@@ -3,6 +3,7 @@ import {
   register,
   login,
   getMe,
+  forgotPassword,
   updateMe,
   updatePassword,
   deactivateMe,
@@ -16,6 +17,7 @@ const router = express.Router();
 // public
 router.post("/register", register);
 router.post("/login", login);
+router.post("/forgot-password", forgotPassword);
 
 // protected
 router.use(protect);
