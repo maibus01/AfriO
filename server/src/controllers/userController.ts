@@ -115,30 +115,53 @@ export const login = async (
 // ==========================
 // 🔑 FORGOT PASSWORD
 // ==========================
-export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { email } = req.body;
 
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
     const user = await User.findOne({ email });
 
-    // ✅ Don't reveal if user exists
+    // Always respond the same (security best practice)
     if (!user) {
       return res.status(200).json({
         success: true,
-        message: "If that email matches an account, a reset link has been sent!",
+        message:
+          "If that email matches an account, a reset link has been sent!",
       });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET is not defined");
     }
 
     const resetToken = jwt.sign(
       { id: user._id.toString() },
-      process.env.JWT_SECRET as string,
+      process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
 
-    const origin = req.get("origin") || "http://localhost:5173";
-    const resetUrl = `${origin}/reset-password/${resetToken}`;
+    // IMPORTANT: use frontend URL, not request origin
+    const FRONTEND_URL =
+      process.env.FRONTEND_URL || "http://localhost:5173";
 
-    // ✅ Better transporter config
+    const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}`;
+
+    // safer email check
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      throw new Error("Email credentials are not set");
+    }
+
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
@@ -149,8 +172,8 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
       },
     });
 
-    // ✅ Verify connection (very useful for debugging)
-    await transporter.verify();
+    // ❌ REMOVE verify() in production (it often breaks on Render)
+    // await transporter.verify();
 
     await transporter.sendMail({
       from: `"LuxeeHub Support" <${process.env.EMAIL_USER}>`,
@@ -164,18 +187,20 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
              style="background:#000;color:#fff;padding:10px 15px;border-radius:6px;text-decoration:none;">
              Reset Password
           </a>
-          <p style="font-size:12px;color:gray;">Expires in 15 minutes</p>
+          <p style="font-size:12px;color:gray;">
+            This link expires in 15 minutes
+          </p>
         </div>
       `,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "If that email matches an account, a reset link has been sent!",
+      message:
+        "If that email matches an account, a reset link has been sent!",
     });
-
   } catch (err) {
-    console.error("EMAIL ERROR:", err); // 👈 IMPORTANT
+    console.error("FORGOT PASSWORD ERROR:", err);
     next(err);
   }
 };
