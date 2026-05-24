@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Mail, Lock, User, Phone, ArrowRight, Loader2, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
@@ -11,6 +12,7 @@ export default function AuthPage() {
   const navigate = useNavigate();
   const [type, setType] = useState<AuthType>("login");
   const [loading, setLoading] = useState(false);
+const location = useLocation();
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   
@@ -46,40 +48,45 @@ export default function AuthPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccessMessage("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setSuccessMessage("");
+  setLoading(true);
 
-    try {
-      if (type === "signup") {
-        if (formData.password !== formData.confirmPassword) {
-          throw new Error("Passwords do not match");
-        }
-        await signup(formData);
-        navigate("/");
-      } else if (type === "login") {
-        await login({
-          email: formData.email,
-          password: formData.password,
-        });
-        navigate("/");
-      } else if (type === "forgot") {
-        // Checking if forgotPassword handler exists on your auth custom hook
-        if (typeof forgotPassword === "function") {
-          await forgotPassword(formData.email);
-        } else {
-          // Fallback log if backend/hook logic is not yet wired up
-          console.warn("forgotPassword function not found on useAuth hook");
-        }
-        setSuccessMessage("Password reset link sent! Please check your inbox.");
+  try {
+    if (type === "signup") {
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "An error occurred");
-    } finally {
-      setLoading(false);
+
+      await signup(formData);
+
+      const redirectTo = location.state?.from || "/";
+      navigate(redirectTo, { state: location.state });
+
+    } else if (type === "login") {
+      await login({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      const redirectTo = location.state?.from || "/";
+      navigate(redirectTo, { state: location.state });
+
+    } else if (type === "forgot") {
+      if (typeof forgotPassword === "function") {
+        await forgotPassword(formData.email);
+      }
+
+      setSuccessMessage("Password reset link sent! Please check your inbox.");
     }
-  };
+
+  } catch (err: any) {
+    setError(err.response?.data?.message || err.message || "An error occurred");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6 select-none">
