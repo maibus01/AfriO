@@ -62,7 +62,7 @@ const location = useLocation();
       await signup(formData);
 
       const redirectTo = location.state?.from || "/";
-      navigate(redirectTo, { state: location.state });
+navigate(redirectTo, { replace: true });
 
     } else if (type === "login") {
       await login({
