@@ -1,4 +1,154 @@
-import mongoose, { Document, Schema, Model, Query } from "mongoose";
+// import mongoose, { Document, Schema, Model, Query } from "mongoose";
+
+// // =======================
+// // INTERFACE
+// // =======================
+// export interface IProduct extends Document {
+//   name: string;
+//   description?: string;
+//   price: number;
+//   images: string[];
+
+//   category:
+//   | "clothes"
+//   | "fabric"
+//   | "kids_baby"
+//   | "phones_accessories"
+//   | "electronics"
+//   | "appliances"
+//   | "furniture"
+//   | "kitchenware"
+//   | "plumbing"
+//   | "shoes_bags"
+//   | "cosmetics_beauty"
+//   | "groceries"
+//   | "automotive"
+//   | "sports_fitness"
+//   | "health_wellness"
+//   | "books_stationery"
+//   | "jewelry_watches"
+//   | "construction_hardware"
+//   | "services"
+//   | "other";
+
+//   stock: number;
+//   sold: number;
+
+//   businessId: mongoose.Types.ObjectId; // vendor business
+//   ownerId: mongoose.Types.ObjectId;    // redundancy for fast filtering
+
+//   isActive: boolean;
+
+//   createdAt?: Date;
+//   updatedAt?: Date;
+
+//   isOwner(userId: string): boolean;
+// }
+
+// // =======================
+// // SCHEMA
+// // =======================
+// const ProductSchema = new Schema<IProduct>(
+//   {
+//     name: {
+//       type: String,
+//       required: true,
+//       trim: true,
+//     },
+
+//     description: {
+//       type: String,
+//       default: "",
+//     },
+
+//     price: {
+//       type: Number,
+//       required: true,
+//       min: 0,
+//     },
+
+//     images: {
+//       type: [String],
+//       default: [],
+//     },
+
+//     category: {
+//       type: String,
+//       enum: [
+//         "clothes", "fabric", "kids_baby", "phones_accessories", "electronics",
+//         "appliances", "furniture", "kitchenware", "plumbing", "shoes_bags",
+//         "cosmetics_beauty", "groceries", "automotive", "sports_fitness",
+//         "health_wellness", "books_stationery", "jewelry_watches",
+//         "construction_hardware", "services", "other"
+//       ],
+//       default: "other",
+//       required: true
+//     },
+
+//     stock: {
+//       type: Number,
+//       default: 0,
+//     },
+
+//     sold: {
+//       type: Number,
+//       default: 0,
+//     },
+
+//     businessId: {
+//       type: Schema.Types.ObjectId,
+//       ref: "Business",
+//       required: true,
+//     },
+
+//     ownerId: {
+//       type: Schema.Types.ObjectId,
+//       ref: "User",
+//       required: true,
+//     },
+
+//     isActive: {
+//       type: Boolean,
+//       default: true,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// // =======================
+// // INDEXES
+// // =======================
+// ProductSchema.index({ businessId: 1 });
+// ProductSchema.index({ ownerId: 1 });
+// ProductSchema.index({ category: 1 });
+// ProductSchema.index({ name: "text" }); // search like Amazon
+
+// // =======================
+// // OWNER CHECK
+// // =======================
+// ProductSchema.methods.isOwner = function (
+//   this: IProduct,
+//   userId: string
+// ): boolean {
+//   return this.ownerId.toString() === userId;
+// };
+
+// // =======================
+// // SOFT DELETE FILTER
+// // =======================
+// ProductSchema.pre(/^find/, function (this: Query<any, IProduct>) {
+//   this.where({ isActive: true });
+// });
+
+// // =======================
+// // MODEL
+// // =======================
+// export const Product: Model<IProduct> =
+//   mongoose.model<IProduct>("Product", ProductSchema);
+
+import mongoose, { Document, Schema, Model } from "mongoose";
 
 // =======================
 // INTERFACE
@@ -6,43 +156,69 @@ import mongoose, { Document, Schema, Model, Query } from "mongoose";
 export interface IProduct extends Document {
   name: string;
   description?: string;
-  price: number;
   images: string[];
 
-  category:
-  | "clothes"
-  | "fabric"
-  | "kids_baby"
-  | "phones_accessories"
-  | "electronics"
-  | "appliances"
-  | "furniture"
-  | "kitchenware"
-  | "plumbing"
-  | "shoes_bags"
-  | "cosmetics_beauty"
-  | "groceries"
-  | "automotive"
-  | "sports_fitness"
-  | "health_wellness"
-  | "books_stationery"
-  | "jewelry_watches"
-  | "construction_hardware"
-  | "services"
-  | "other";
+  category: string;
 
-  stock: number;
-  sold: number;
+  condition: "new" | "used" | "refurbished";
 
-  businessId: mongoose.Types.ObjectId; // vendor business
-  ownerId: mongoose.Types.ObjectId;    // redundancy for fast filtering
+  basePrice?: number;
+  currency: "NGN" | "USD" | "CNY" | "GBP";
+
+  stock?: number;
+  sold?: number;
+
+  features: {
+    variants: boolean;
+    attributes: boolean;
+    size: boolean;
+    color: boolean;
+    weight: boolean;
+    measurement: boolean;
+    bulkPricing: boolean;
+    origin: boolean;
+  };
+
+  attributes?: Record<string, string[]>;
+
+  variants?: Array<{
+    id: string;
+    sku: string;
+    options: Record<string, string>;
+    price: number;
+    stock: number;
+    weight?: number;
+    images?: string[];
+  }>;
+
+  measurement?: {
+    unit: "meter" | "yard" | "kg" | "liter";
+    pricePerUnit: number;
+    minOrder: number;
+  };
+
+  bulkPricing?: Array<{
+    minQty: number;
+    maxQty?: number;
+    price: number;
+  }>;
+
+  origin?: {
+    country: string;
+    city: string;
+    factory?: string;
+    shop?: string;
+  };
+
+  shippingTemplateId?: mongoose.Types.ObjectId;
+
+  businessId: mongoose.Types.ObjectId;
+  ownerId: mongoose.Types.ObjectId;
 
   isActive: boolean;
 
   createdAt?: Date;
   updatedAt?: Date;
-
-  isOwner(userId: string): boolean;
 }
 
 // =======================
@@ -50,51 +226,116 @@ export interface IProduct extends Document {
 // =======================
 const ProductSchema = new Schema<IProduct>(
   {
-    name: {
+    name: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
+    images: { type: [String], default: [] },
+
+    category: { type: String, required: true },
+
+    condition: {
       type: String,
-      required: true,
-      trim: true,
+      enum: ["new", "used", "refurbished"],
+      default: "new",
     },
 
-    description: {
+    basePrice: { type: Number, min: 0 },
+
+    currency: {
       type: String,
-      default: "",
+      enum: ["NGN", "USD", "CNY", "GBP"],
+      default: "NGN",
     },
 
-    price: {
-      type: Number,
-      required: true,
-      min: 0,
+    stock: { type: Number, default: 0 },
+    sold: { type: Number, default: 0 },
+
+    // =========================
+    // FEATURES
+    // =========================
+    features: {
+      variants: { type: Boolean, default: false },
+      attributes: { type: Boolean, default: false },
+      size: { type: Boolean, default: false },
+      color: { type: Boolean, default: false },
+      weight: { type: Boolean, default: false },
+      measurement: { type: Boolean, default: false },
+      bulkPricing: { type: Boolean, default: false },
+      origin: { type: Boolean, default: false },
     },
 
-    images: {
-      type: [String],
+    // =========================
+    // ATTRIBUTES (dynamic)
+    // =========================
+    attributes: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+
+    // =========================
+    // VARIANTS
+    // =========================
+    variants: {
+      type: [
+        {
+          id: { type: String },
+          sku: { type: String },
+          options: { type: Schema.Types.Mixed },
+          price: { type: Number },
+          stock: { type: Number },
+          weight: { type: Number },
+          images: { type: [String], default: [] },
+        },
+      ],
       default: [],
     },
 
-    category: {
-      type: String,
-      enum: [
-        "clothes", "fabric", "kids_baby", "phones_accessories", "electronics",
-        "appliances", "furniture", "kitchenware", "plumbing", "shoes_bags",
-        "cosmetics_beauty", "groceries", "automotive", "sports_fitness",
-        "health_wellness", "books_stationery", "jewelry_watches",
-        "construction_hardware", "services", "other"
+    // =========================
+    // MEASUREMENT
+    // =========================
+    measurement: {
+      unit: {
+        type: String,
+        enum: ["meter", "yard", "kg", "liter"],
+      },
+      pricePerUnit: Number,
+      minOrder: Number,
+    },
+
+    // =========================
+    // BULK PRICING
+    // =========================
+    bulkPricing: {
+      type: [
+        {
+          minQty: Number,
+          maxQty: Number,
+          price: Number,
+        },
       ],
-      default: "other",
-      required: true
+      default: [],
     },
 
-    stock: {
-      type: Number,
-      default: 0,
+    // =========================
+    // ORIGIN
+    // =========================
+    origin: {
+      country: String,
+      city: String,
+      factory: String,
+      shop: String,
     },
 
-    sold: {
-      type: Number,
-      default: 0,
+    // =========================
+    // SHIPPING
+    // =========================
+    shippingTemplateId: {
+      type: Schema.Types.ObjectId,
+      ref: "ShippingTemplate",
     },
 
+    // =========================
+    // OWNERSHIP
+    // =========================
     businessId: {
       type: Schema.Types.ObjectId,
       ref: "Business",
@@ -118,29 +359,12 @@ const ProductSchema = new Schema<IProduct>(
 );
 
 // =======================
-// INDEXES
+// INDEXES (recommended)
 // =======================
 ProductSchema.index({ businessId: 1 });
 ProductSchema.index({ ownerId: 1 });
 ProductSchema.index({ category: 1 });
-ProductSchema.index({ name: "text" }); // search like Amazon
-
-// =======================
-// OWNER CHECK
-// =======================
-ProductSchema.methods.isOwner = function (
-  this: IProduct,
-  userId: string
-): boolean {
-  return this.ownerId.toString() === userId;
-};
-
-// =======================
-// SOFT DELETE FILTER
-// =======================
-ProductSchema.pre(/^find/, function (this: Query<any, IProduct>) {
-  this.where({ isActive: true });
-});
+ProductSchema.index({ name: "text" });
 
 // =======================
 // MODEL

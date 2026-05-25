@@ -1,9 +1,290 @@
+// import { Request, Response, NextFunction } from "express";
+// import { Product } from "../models/Product";
+// import { Business } from "../models/Business";
+
+// // =========================
+// // CREATE PRODUCT (VENDOR ONLY)
+// // =========================
+// export const createProduct = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const { name, description, price, images, category, stock, businessId } =
+//       req.body;
+
+//     // 🔐 check business belongs to user
+//     const business = await Business.findById(businessId);
+
+//     if (!business) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Business not found",
+//       });
+//     }
+
+//     if (business.ownerId.toString() !== req.user.id) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "Not your business",
+//       });
+//     }
+
+//     if (business.category !== "vendor") {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Only vendor businesses can add products",
+//       });
+//     }
+
+//     const product = await Product.create({
+//       name,
+//       description,
+//       price,
+//       images,
+//       category,
+//       stock,
+//       businessId,
+//       ownerId: req.user.id,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       data: product,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// export const getAllProductsAdmin = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const products = await Product.find()
+//       .populate("businessId")
+//       .populate("ownerId");
+
+//     res.json({
+//       success: true,
+//       products,
+//     });
+//   } catch (err) {
+//     res.status(500).json({ message: "Failed to fetch products" });
+//   }
+// };
+
+// // =========================
+// // GET MY VENDOR PRODUCTS
+// // =========================
+// export const getMyProducts = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const products = await Product.find({
+//       ownerId: req.user.id,
+//     }).populate("businessId");
+
+//     res.status(200).json({
+//       success: true,
+//       results: products.length,
+//       data: products,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// // =========================
+// // PUBLIC: GET PRODUCT BY ID
+// // =========================
+// export const getProductById = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const product = await Product.findById(req.params.id).populate("businessId");
+
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       data: product,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// export const getProductsByBusiness = async (req: Request, res: Response) => {
+//   try {
+//     const products = await Product.find({
+//       businessId: req.params.businessId,
+//       isActive: true,
+//     }).populate("businessId");
+
+//     res.json({
+//       success: true,
+//       data: products,
+//     });
+//   } catch (err) {
+//     res.status(500).json({ message: "Error fetching products" });
+//   }
+// };
+
+// // =========================
+// // UPDATE PRODUCT
+// // =========================
+// export const updateProduct = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const product = await Product.findById(req.params.id);
+
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     if (product.ownerId.toString() !== req.user.id) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "Not authorized",
+//       });
+//     }
+
+//     const allowed = ["name", "description", "price", "images", "stock", "category"];
+
+//     allowed.forEach((field) => {
+//       if (req.body[field] !== undefined) {
+//         (product as any)[field] = req.body[field];
+//       }
+//     });
+
+//     await product.save();
+
+//     res.status(200).json({
+//       success: true,
+//       data: product,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// // =========================
+// // DELETE PRODUCT (SOFT DELETE)
+// // =========================
+// export const deleteProduct = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const product = await Product.findById(req.params.id);
+
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     if (product.ownerId.toString() !== req.user.id) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "Not authorized",
+//       });
+//     }
+
+//     product.isActive = false;
+//     await product.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Product removed",
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// // =========================
+// // PUBLIC: GET ALL PRODUCTS
+// // =========================
+// export const getAllProducts = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const { category } = req.query;
+
+//     const filter: any = {};
+
+//     if (category) {
+//       filter.category = category;
+//     }
+
+//     const products = await Product.find(filter)
+//       .populate("businessId")
+//       .sort({ createdAt: -1 });
+
+//     res.status(200).json({
+//       success: true,
+//       results: products.length,
+//       data: products,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
 import { Request, Response, NextFunction } from "express";
+import mongoose from "mongoose";
 import { Product } from "../models/Product";
 import { Business } from "../models/Business";
 
+
 // =========================
-// CREATE PRODUCT (VENDOR ONLY)
+// UTILITY: CHECK BUSINESS OWNERSHIP
+// =========================
+const verifyBusinessOwnership = async (businessId: string, userId: string) => {
+  const business = await Business.findById(businessId);
+
+  if (!business) {
+    return { error: "Business not found", status: 404 };
+  }
+
+  if (business.ownerId.toString() !== userId) {
+    return { error: "Not your business", status: 403 };
+  }
+
+  if (business.category !== "vendor") {
+    return { error: "Only vendor businesses can add products", status: 400 };
+  }
+
+  return { business };
+};
+
+
+// =========================
+// CREATE PRODUCT (ADVANCED MODEL)
 // =========================
 export const createProduct = async (
   req: Request,
@@ -11,10 +292,24 @@ export const createProduct = async (
   next: NextFunction
 ) => {
   try {
-    const { name, description, price, images, category, stock, businessId } =
-      req.body;
+    const {
+      name,
+      description,
+      basePrice,
+      currency,
+      images,
+      category,
+      stock,
+      businessId,
+      features,
+      attributes,
+      variants,
+      measurement,
+      bulkPricing,
+      origin,
+    } = req.body;
 
-    // 🔐 check business belongs to user
+    // 🔐 business check
     const business = await Business.findById(businessId);
 
     if (!business) {
@@ -31,25 +326,34 @@ export const createProduct = async (
       });
     }
 
+    // ⚠️ optional now (since only your team uses it)
     if (business.category !== "vendor") {
       return res.status(400).json({
         success: false,
-        message: "Only vendor businesses can add products",
+        message: "Invalid business type",
       });
     }
 
     const product = await Product.create({
       name,
       description,
-      price,
+      basePrice,
+      currency,
       images,
       category,
       stock,
       businessId,
       ownerId: req.user.id,
+
+      features,
+      attributes,
+      variants,
+      measurement,
+      bulkPricing,
+      origin,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: product,
     });
@@ -58,11 +362,11 @@ export const createProduct = async (
   }
 };
 
-export const getAllProductsAdmin = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+
+// =========================
+// GET ALL PRODUCTS (ADMIN)
+// =========================
+export const getAllProductsAdmin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const products = await Product.find()
       .populate("businessId")
@@ -70,24 +374,23 @@ export const getAllProductsAdmin = async (
 
     res.json({
       success: true,
-      products,
+      results: products.length,
+      data: products,
     });
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch products" });
+    next(err);
   }
 };
 
+
 // =========================
-// GET MY VENDOR PRODUCTS
+// GET MY PRODUCTS
 // =========================
-export const getMyProducts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getMyProducts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const products = await Product.find({
       ownerId: req.user.id,
+      isActive: true,
     }).populate("businessId");
 
     res.status(200).json({
@@ -100,16 +403,15 @@ export const getMyProducts = async (
   }
 };
 
+
 // =========================
-// PUBLIC: GET PRODUCT BY ID
+// GET PRODUCT BY ID
 // =========================
-export const getProductById = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getProductById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const product = await Product.findById(req.params.id).populate("businessId");
+    const product = await Product.findById(req.params.id)
+      .populate("businessId")
+      .populate("ownerId");
 
     if (!product) {
       return res.status(404).json({
@@ -118,7 +420,7 @@ export const getProductById = async (
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: product,
     });
@@ -127,7 +429,11 @@ export const getProductById = async (
   }
 };
 
-export const getProductsByBusiness = async (req: Request, res: Response) => {
+
+// =========================
+// GET PRODUCTS BY BUSINESS
+// =========================
+export const getProductsByBusiness = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const products = await Product.find({
       businessId: req.params.businessId,
@@ -136,21 +442,19 @@ export const getProductsByBusiness = async (req: Request, res: Response) => {
 
     res.json({
       success: true,
+      results: products.length,
       data: products,
     });
   } catch (err) {
-    res.status(500).json({ message: "Error fetching products" });
+    next(err);
   }
 };
 
+
 // =========================
-// UPDATE PRODUCT
+// UPDATE PRODUCT (SAFE PATCH)
 // =========================
-export const updateProduct = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const product = await Product.findById(req.params.id);
 
@@ -168,9 +472,23 @@ export const updateProduct = async (
       });
     }
 
-    const allowed = ["name", "description", "price", "images", "stock", "category"];
+    const allowedFields = [
+      "name",
+      "description",
+      "images",
+      "category",
+      "basePrice",
+      "currency",
+      "stock",
+      "features",
+      "attributes",
+      "variants",
+      "measurement",
+      "bulkPricing",
+      "origin",
+    ];
 
-    allowed.forEach((field) => {
+    allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
         (product as any)[field] = req.body[field];
       }
@@ -187,14 +505,11 @@ export const updateProduct = async (
   }
 };
 
+
 // =========================
 // DELETE PRODUCT (SOFT DELETE)
 // =========================
-export const deleteProduct = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const deleteProduct = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const product = await Product.findById(req.params.id);
 
@@ -217,28 +532,35 @@ export const deleteProduct = async (
 
     res.status(200).json({
       success: true,
-      message: "Product removed",
+      message: "Product soft deleted",
     });
   } catch (err) {
     next(err);
   }
 };
 
+
 // =========================
-// PUBLIC: GET ALL PRODUCTS
+// PUBLIC: GET ALL PRODUCTS (FILTERED)
 // =========================
-export const getAllProducts = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getAllProducts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { category } = req.query;
+    const { category, search, minPrice, maxPrice } = req.query;
 
-    const filter: any = {};
+    const filter: any = {
+      isActive: true,
+    };
 
-    if (category) {
-      filter.category = category;
+    if (category) filter.category = category;
+
+    if (search) {
+      filter.$text = { $search: search as string };
+    }
+
+    if (minPrice || maxPrice) {
+      filter.basePrice = {};
+      if (minPrice) filter.basePrice.$gte = Number(minPrice);
+      if (maxPrice) filter.basePrice.$lte = Number(maxPrice);
     }
 
     const products = await Product.find(filter)
@@ -253,4 +575,197 @@ export const getAllProducts = async (
   } catch (err) {
     next(err);
   }
+};
+
+export const addVariant = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    if (product.ownerId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    const newVariant = {
+      id: new mongoose.Types.ObjectId().toString(),
+      ...req.body,
+    };
+
+    product.variants = product.variants || [];
+    product.variants.push(newVariant);
+
+    await product.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Variant added",
+      data: product,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateVariant = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { productId, variantId } = req.params;
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    if (product.ownerId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    const variant = product.variants?.find(v => v.id === variantId);
+
+    if (!variant) {
+      return res.status(404).json({ success: false, message: "Variant not found" });
+    }
+
+    Object.assign(variant, req.body);
+
+    await product.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Variant updated",
+      data: product,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteVariant = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { productId, variantId } = req.params;
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    if (product.ownerId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    product.variants = product.variants?.filter(v => v.id !== variantId);
+
+    await product.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Variant deleted",
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const decreaseStock = async (productId: string, qty: number) => {
+  const product = await Product.findById(productId);
+
+  if (!product) throw new Error("Product not found");
+
+  if ((product.stock || 0) < qty) {
+    throw new Error("Insufficient stock");
+  }
+
+  product.stock = (product.stock || 0) - qty;
+  product.sold = (product.sold || 0) + qty;
+
+  await product.save();
+
+  return product;
+};
+
+export const increaseStock = async (productId: string, qty: number) => {
+  const product = await Product.findById(productId);
+
+  if (!product) throw new Error("Product not found");
+
+  product.stock = (product.stock || 0) + qty;
+  product.sold = Math.max((product.sold || 0) - qty, 0);
+
+  await product.save();
+
+  return product;
+};
+
+export const reserveStock = async (productId: string, qty: number) => {
+  const product = await Product.findOneAndUpdate(
+    {
+      _id: productId,
+      stock: { $gte: qty },
+    },
+    {
+      $inc: {
+        stock: -qty,
+        reserved: qty,
+      },
+    },
+    { new: true }
+  );
+
+  if (!product) {
+    throw new Error("Insufficient stock");
+  }
+
+  return product;
+};
+
+export const getTopProducts = async (req: Request, res: Response) => {
+  const products = await Product.find()
+    .sort({ sold: -1 })
+    .limit(10);
+
+  res.json({
+    success: true,
+    data: products,
+  });
+};
+
+export const getLowStockProducts = async (req: Request, res: Response) => {
+  const products = await Product.find({
+    stock: { $lte: 5 },
+    isActive: true,
+  });
+
+  res.json({
+    success: true,
+    data: products,
+  });
+};
+
+export const getVendorStats = async (req: Request, res: Response) => {
+  const stats = await Product.aggregate([
+    { $match: { ownerId: new mongoose.Types.ObjectId(req.user.id) } },
+    {
+      $project: {
+        revenue: { $multiply: ["$sold", "$basePrice"] },
+        sold: 1,
+        stock: 1,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: "$revenue" },
+        totalSold: { $sum: "$sold" },
+      },
+    },
+  ]);
+
+  res.json({
+    success: true,
+    data: stats[0] || { totalRevenue: 0, totalSold: 0 },
+  });
 };
