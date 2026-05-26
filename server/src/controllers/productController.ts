@@ -625,6 +625,7 @@ export const getAllProducts = async (req: Request, res: Response, next: NextFunc
 export const addVariant = async (req: any, res: any, next: any) => {
   try {
     const product = await Product.findById(req.params.id);
+    console.log("FILES:", req.files);
 
     if (!product) {
       return res.status(404).json({ success: false, message: "Product not found" });
@@ -683,6 +684,7 @@ export const addVariant = async (req: any, res: any, next: any) => {
       data: product,
     });
   } catch (err) {
+    console.log("FILES:", req.files);
     next(err);
   }
 };
