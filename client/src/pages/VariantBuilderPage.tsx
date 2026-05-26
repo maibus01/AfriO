@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import type { KeyboardEvent } from "react";
-import { Trash2, Plus, Sliders, Layers, DollarSign, Package, X, HelpCircle, Check, Image as ImageIcon, AlertTriangle } from "lucide-react";
+import type { KeyboardEvent, ChangeEvent, MouseEvent } from "react";
+import { Trash2, Plus, Sliders, Layers, DollarSign, Package, X, HelpCircle, Image as ImageIcon, AlertTriangle } from "lucide-react";
 
 type Variant = {
   id: string;
@@ -23,7 +23,6 @@ interface Props {
   onClose: () => void;
 }
 
-// 📦 Define the high-level Product Type templates
 type ProductType = "clothing" | "phone" | "electronics" | "custom";
 
 const VARIANT_LIMIT = 200;
@@ -34,9 +33,7 @@ export default function VariantBuilderPage({
   onSave,
   onClose,
 }: Props) {
-  // Track the top-level product category type
   const [productType, setProductType] = useState<ProductType>("custom");
-  
   const [attributes, setAttributes] = useState<Attribute[]>([
     { name: "Color", values: [], hasImage: true },
   ]);
@@ -51,11 +48,10 @@ export default function VariantBuilderPage({
   // ⚡ PRODUCT TYPE TEMPLATE ENFORCER
   const handleProductTypeChange = (type: ProductType) => {
     setProductType(type);
-    setVariants([]); // Clear variants to prevent stale matrices
+    setVariants([]); 
     setAttributeImages({});
     setErrorMessage(null);
 
-    // Swap templates instantly based on choice
     switch (type) {
       case "clothing":
         setAttributes([
@@ -172,39 +168,26 @@ export default function VariantBuilderPage({
     setErrorMessage(null);
   };
 
-  // 📸 IMAGE UPLOAD HANDLER
- const handleImageUpload = async (
-  attrName: string,
-  value: string,
-  e: React.ChangeEvent<HTMLInputElement>
-) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  // 📸 LOCAL IMAGE UPLOAD HANDLER (INSTANT PREVIEW STRATEGY)
+  const handleImageUpload = (attrName: string, value: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const formData = new FormData();
-  formData.append("images", file);
+    // Convert directly to local blob URL for layout rendering
+    const localBlobUrl = URL.createObjectURL(file);
+    const compositeKey = `${attrName}:${value}`;
 
-  const res = await fetch("/api/upload-single", {
-    method: "POST",
-    body: formData,
-  });
+    setAttributeImages((prev) => ({
+      ...prev,
+      [compositeKey]: localBlobUrl,
+    }));
+  };
 
-  const data = await res.json();
-
-  const imageUrl = data.url; // Cloudinary URL
-
-  const compositeKey = `${attrName}:${value}`;
-
-  setAttributeImages((prev) => ({
-    ...prev,
-    [compositeKey]: imageUrl,
-  }));
-};
   const triggerFileInput = (attrName: string, value: string) => {
     fileInputRefs.current[`${attrName}:${value}`]?.click();
   };
 
-  const removeImage = (attrName: string, value: string, e: React.MouseEvent) => {
+  const removeImage = (attrName: string, value: string, e: MouseEvent) => {
     e.stopPropagation();
     setAttributeImages(prev => {
       const updated = { ...prev };
@@ -256,7 +239,8 @@ export default function VariantBuilderPage({
 
     const newVariants: Variant[] = combos.map((combo, i) => {
       const skuSuffix = Object.values(combo).join("-").replace(/\s+/g, "").toUpperCase();
-      const generatedSku = `${baseName.substring(0, 3).toUpperCase()}-${skuSuffix}`;
+      const prefix = baseName ? baseName.substring(0, 3).toUpperCase() : "GEN";
+      const generatedSku = `${prefix}-${skuSuffix}`;
 
       const existingMatch = variants.find(v => 
         Object.keys(combo).length === Object.keys(v.options).length &&
@@ -334,7 +318,7 @@ export default function VariantBuilderPage({
           </div>
         )}
 
-        {/* 🏬 NEW: TOP-LEVEL PRODUCT TYPE SELECTOR PILLS */}
+        {/* TEMPLATE PICKERS */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wider block">
             What type of product is this?
@@ -365,7 +349,7 @@ export default function VariantBuilderPage({
           </div>
         </div>
 
-        {/* DYNAMIC ATTRIBUTES BUILDER */}
+        {/* ATTRIBUTES CONFIGURATION MATRIX */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wider block">
@@ -383,7 +367,6 @@ export default function VariantBuilderPage({
           {attributes.map((attr, index) => (
             <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/40 border border-gray-100 rounded-xl items-start">
               
-              {/* Attribute Label Name */}
               <div className="md:col-span-3 space-y-2">
                 <div>
                   <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wide block mb-1">Label Name</span>
@@ -405,7 +388,6 @@ export default function VariantBuilderPage({
                 </label>
               </div>
 
-              {/* Tag System Values Output + Input */}
               <div className="md:col-span-8 space-y-1.5">
                 <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
                   Values (Type value and press <kbd className="bg-gray-200 px-1 rounded text-[10px] font-mono font-bold text-gray-600">Enter</kbd>)
@@ -473,7 +455,6 @@ export default function VariantBuilderPage({
                 </div>
               </div>
 
-              {/* Delete Attribute Row */}
               <div className="md:col-span-1 flex justify-end pt-5 md:pt-4">
                 <button
                   type="button"
@@ -490,7 +471,7 @@ export default function VariantBuilderPage({
           ))}
         </div>
 
-        {/* ACTIONS & COMBINATION MATRIX TRIGGER */}
+        {/* ENGINE TRANSLATION ACTIONS */}
         <div className="bg-white rounded-xl space-y-3">
           {showOverwiteWarning && (
             <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -528,7 +509,7 @@ export default function VariantBuilderPage({
           </div>
         </div>
 
-        {/* MATRIX CONTAINER */}
+        {/* COMBINATION MATRIX PRESENTATION */}
         {variants.length > 0 && (
           <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <div className="hidden md:grid grid-cols-12 gap-3 bg-gray-50 px-4 py-2.5 border-b border-gray-200 text-xs font-semibold text-zinc-600 uppercase tracking-wider">
@@ -542,7 +523,6 @@ export default function VariantBuilderPage({
               {variants.map((v) => (
                 <div key={v.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors">
                   
-                  {/* Dynamic Chip Mapping */}
                   <div className="col-span-4 flex flex-wrap gap-1 w-full">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-0.5 w-full">Attributes Mapping</span>
                     {Object.keys(v.options).length === 0 ? (
@@ -593,7 +573,7 @@ export default function VariantBuilderPage({
                     </div>
                   </div>
 
-                  {/* STOCK & DELETE */}
+                  {/* INVENTORY CAPACITIES */}
                   <div className="col-span-2 flex gap-3 items-end md:items-center w-full">
                     <div className="relative w-full">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-1">Stock</span>
