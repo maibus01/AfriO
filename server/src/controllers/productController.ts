@@ -287,29 +287,35 @@ const verifyBusinessOwnership = async (businessId: string, userId: string) => {
 // =========================
 // CREATE PRODUCT (ADVANCED MODEL)
 // =========================
-export const createProduct = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+// 🔧 helper: safe JSON parser (prevents crashes)
+const parseIfJson = (value: any) => {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value; // fallback if invalid JSON
+  }
+};
+
+export const createProduct = async (req: any, res: any, next: any) => {
   try {
     const {
       name,
       description,
-      basePrice,
-      currency,
+      price,
       category,
       stock,
       businessId,
-      features,
-      attributes,
-      variants,
-      measurement,
-      bulkPricing,
-      origin,
     } = req.body;
 
-    // 🔐 business check
+    // 🔐 MUST exist
+    if (!req.user?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
     const business = await Business.findById(businessId);
 
     if (!business) {
@@ -326,36 +332,44 @@ export const createProduct = async (
       });
     }
 
-    // 📸 IMAGE UPLOAD (THIS IS THE IMPORTANT PART)
+    // 📸 images (safe fallback)
     let imageUrls: string[] = [];
 
     if (req.files && Array.isArray(req.files)) {
-      const uploadResults = await Promise.all(
-        req.files.map((file: any) =>
-          uploadToCloudinary(file.buffer)
-        )
+      const uploads = await Promise.all(
+        req.files.map((f: any) => uploadToCloudinary(f.buffer))
       );
 
-      imageUrls = uploadResults.map((r) => r.secure_url);
+      imageUrls = uploads.map((r) => r.secure_url);
     }
+
+    // 🧠 SAFE JSON parsing ONLY if exists
+    const safeParse = (v: any) => {
+      if (!v) return undefined;
+      if (typeof v !== "string") return v;
+      try {
+        return JSON.parse(v);
+      } catch {
+        return undefined;
+      }
+    };
 
     const product = await Product.create({
       name,
       description,
-      basePrice,
-      currency,
+      basePrice: price ? Number(price) : undefined,
       category,
-      stock,
+      stock: stock ? Number(stock) : 0,
+
+      images: imageUrls,
       businessId,
       ownerId: req.user.id,
 
-      images: imageUrls, // 👈 IMPORTANT
-      features: typeof features === "string" ? JSON.parse(features) : features,
-      attributes: typeof attributes === "string" ? JSON.parse(attributes) : attributes,
-      variants: typeof variants === "string" ? JSON.parse(variants) : variants,
-      measurement,
-      bulkPricing,
-      origin,
+      features: safeParse(req.body.features),
+      variants: safeParse(req.body.variants),
+      measurement: safeParse(req.body.measurement),
+      bulkPricing: safeParse(req.body.bulkPricing),
+      origin: safeParse(req.body.origin),
     });
 
     return res.status(201).json({
@@ -363,10 +377,10 @@ export const createProduct = async (
       data: product,
     });
   } catch (err) {
+    console.error("CREATE PRODUCT ERROR:", err);
     next(err);
   }
 };
-
 
 // =========================
 // GET ALL PRODUCTS (ADMIN)
