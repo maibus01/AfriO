@@ -200,7 +200,7 @@ router.delete("/:id", protect, restrictTo("user"), deleteProduct);
 router.post(
   "/:id/variants",
   protect,
-  restrictTo("vendor"),
+  restrictTo("user"),
   upload.single("image"), // 👈 IMPORTANT
   addVariant
 );
@@ -208,14 +208,14 @@ router.post(
 router.patch(
   "/:id/variants/:variantId",
   protect,
-  restrictTo("vendor"),
+  restrictTo("user"),
   updateVariant
 );
 
 router.delete(
   "/:id/variants/:variantId",
   protect,
-  restrictTo("vendor"),
+  restrictTo("user"),
   deleteVariant
 );
 
