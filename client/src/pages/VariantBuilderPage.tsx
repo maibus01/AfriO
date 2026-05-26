@@ -1,4 +1,6 @@
-import { useState, KeyboardEvent, useRef } from "react";
+import { useState, useRef } from "react";
+import type { KeyboardEvent } from "react"; // ⬅️ Type-only import right here
+
 import { Trash2, Plus, Sliders, Layers, DollarSign, Package, X, HelpCircle, Check, Image as ImageIcon, AlertTriangle } from "lucide-react";
 
 type Variant = {
