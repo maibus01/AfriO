@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2, Plus, Sliders, Layers, DollarSign, Package, X } from "lucide-react";
+import { Trash2, Plus, Sliders, Layers, DollarSign, Package, X, HelpCircle } from "lucide-react";
 
 type Variant = {
   id: string;
@@ -8,6 +8,11 @@ type Variant = {
   price: number;
   stock: number;
 };
+
+interface Attribute {
+  name: string;
+  values: string[];
+}
 
 interface Props {
   baseName: string;
@@ -22,41 +27,85 @@ export default function VariantBuilderPage({
   onSave,
   onClose,
 }: Props) {
-  const [sizes, setSizes] = useState("");
-  const [colors, setColors] = useState("");
+  // ⚡ Fully dynamic marketplace attributes state
+  const [attributes, setAttributes] = useState<Attribute[]>([
+    { name: "Color", values: [] },
+  ]);
   const [variants, setVariants] = useState<Variant[]>([]);
 
-  // ⚡ AUTO GENERATE COMBINATIONS
+  // 🛠️ ATTRIBUTE MANAGEMENT HANDLERS
+  const addAttributeField = () => {
+    setAttributes((prev) => [...prev, { name: "", values: [] }]);
+  };
+
+  const removeAttributeField = (index: number) => {
+    setAttributes((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateAttributeName = (index: number, name: string) => {
+    setAttributes((prev) =>
+      prev.map((attr, i) => (i === index ? { ...attr, name } : attr))
+    );
+  };
+
+  const handleValuesInput = (index: number, valueString: string) => {
+    // Splits on commas and strips out empty spaces on-the-fly
+    const valuesArray = valueString
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v !== "");
+
+    setAttributes((prev) =>
+      prev.map((attr, i) => (i === index ? { ...attr, values: valuesArray } : attr))
+    );
+  };
+
+  // ⚡ RECURSIVE CARTESIAN ENGINE (Universal Generation Engine)
   const generateVariants = () => {
-    const sizeArr = sizes.split(",").map((s) => s.trim()).filter(Boolean);
-    const colorArr = colors.split(",").map((c) => c.trim()).filter(Boolean);
+    // Only compile fields with a name and actual values present
+    const validAttributes = attributes.filter(
+      (attr) => attr.name.trim() && attr.values.length > 0
+    );
 
-    let combos: Record<string, string>[] = [];
+    if (validAttributes.length === 0) return;
 
-    if (sizeArr.length && colorArr.length) {
-      sizeArr.forEach((s) =>
-        colorArr.forEach((c) => combos.push({ size: s, color: c }))
-      );
-    } else if (sizeArr.length) {
-      sizeArr.forEach((s) => combos.push({ size: s }));
-    } else if (colorArr.length) {
-      colorArr.forEach((c) => combos.push({ color: c }));
+    const combos: Record<string, string>[] = [];
+
+    function backtrack(index: number, currentCombo: Record<string, string>) {
+      if (index === validAttributes.length) {
+        combos.push({ ...currentCombo });
+        return;
+      }
+
+      const currentAttr = validAttributes[index];
+      for (const value of currentAttr.values) {
+        currentCombo[currentAttr.name] = value;
+        backtrack(index + 1, currentCombo);
+      }
     }
 
-    const newVariants: Variant[] = combos.map((combo, i) => ({
-      id: `var-${Date.now()}-${i}`,
-      sku: `${baseName.substring(0, 3).toUpperCase()}-${Object.values(combo)
+    backtrack(0, {});
+
+    const newVariants: Variant[] = combos.map((combo, i) => {
+      // Intelligently auto-generate a descriptive dynamic SKU string
+      const skuSuffix = Object.values(combo)
         .join("-")
-        .toUpperCase()}`,
-      options: combo,
-      price: basePrice || 0,
-      stock: 10,
-    }));
+        .replace(/\s+/g, "")
+        .toUpperCase();
+        
+      return {
+        id: `var-${Date.now()}-${i}`,
+        sku: `${baseName.substring(0, 3).toUpperCase()}-${skuSuffix}`,
+        options: combo,
+        price: basePrice || 0,
+        stock: 10,
+      };
+    });
 
     setVariants(newVariants);
   };
 
-  // ➕ MANUAL ADD
+  // ➕ MANUAL ADD (Gracefully degradation to custom unmapped rows)
   const addVariant = () => {
     setVariants((prev) => [
       ...prev,
@@ -70,32 +119,25 @@ export default function VariantBuilderPage({
     ]);
   };
 
-  // ❌ DELETE
+  // ❌ DELETE VARIANT
   const removeVariant = (id: string) => {
     setVariants((prev) => prev.filter((v) => v.id !== id));
   };
 
-  // ✏️ UPDATE FIELD
-  const updateVariant = (
-    id: string,
-    field: keyof Variant,
-    value: any
-  ) => {
+  // ✏️ UPDATE SINGLE VARIANT FIELDS
+  const updateVariant = (id: string, field: keyof Variant, value: any) => {
     setVariants((prev) =>
-      prev.map((v) =>
-        v.id === id ? { ...v, [field]: value } : v
-      )
+      prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
     );
   };
 
-  // Reusable Save Button sub-component to keep code clean
   const SaveButton = () => (
     <button
       onClick={() => onSave(variants)}
       disabled={variants.length === 0}
       className={`w-full font-medium py-3 rounded-lg text-sm transition-all shadow-sm ${
-        variants.length === 0 
-          ? "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none" 
+        variants.length === 0
+          ? "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
           : "bg-zinc-950 hover:bg-zinc-800 text-white"
       }`}
     >
@@ -111,12 +153,12 @@ export default function VariantBuilderPage({
         <div className="flex items-center gap-3">
           <Sliders className="text-zinc-700 w-5 h-5 flex-shrink-0" />
           <div>
-            <h2 className="text-base sm:text-lg font-semibold text-zinc-900">Variant Builder</h2>
-            <p className="text-xs text-gray-500">Manage stock and pricing for variations</p>
+            <h2 className="text-base sm:text-lg font-semibold text-zinc-900">Universal Variant Engine</h2>
+            <p className="text-xs text-gray-500">Add custom attributes and options dynamically</p>
           </div>
         </div>
-        <button 
-          onClick={onClose} 
+        <button
+          onClick={onClose}
           className="p-1.5 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded-lg transition-colors"
         >
           <X size={18} />
@@ -124,63 +166,101 @@ export default function VariantBuilderPage({
       </div>
 
       <div className="p-4 sm:p-6 space-y-6 overflow-y-auto max-h-[calc(100vh-120px)]">
-        {/* INPUTS SECTION */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wider">Generate Attributes</label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <span className="text-xs text-gray-500">Sizes (Comma separated)</span>
-              <input
-                placeholder="S, M, L, XL"
-                value={sizes}
-                onChange={(e) => setSizes(e.target.value)}
-                className="w-full border border-gray-200 px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
-              />
-            </div>
+        
+        {/* DYNAMIC ATTRIBUTIONS CREATOR */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-zinc-700 uppercase tracking-wider block">
+              Product Attributes
+            </label>
+            <button
+              type="button"
+              onClick={addAttributeField}
+              className="text-xs font-medium text-zinc-950 hover:text-zinc-800 flex items-center gap-1.5 border border-zinc-200 px-2.5 py-1 rounded-md bg-white hover:bg-gray-50 shadow-xs transition-all"
+            >
+              <Plus size={13} /> Add Custom Attribute
+            </button>
+          </div>
 
-            <div className="space-y-1">
-              <span className="text-xs text-gray-500">Colors (Comma separated)</span>
-              <input
-                placeholder="Black, White, Crimson"
-                value={colors}
-                onChange={(e) => setColors(e.target.value)}
-                className="w-full border border-gray-200 px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent transition-all"
-              />
-            </div>
+          <div className="space-y-3">
+            {attributes.map((attr, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3.5 bg-gray-50/50 border border-gray-100 rounded-xl"
+              >
+                {/* ATTRIBUTE KEY NAME */}
+                <div className="md:col-span-4 space-y-1">
+                  <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Attribute Label
+                  </span>
+                  <input
+                    placeholder="e.g., Storage, Material, Size"
+                    value={attr.name}
+                    onChange={(e) => updateAttributeName(index, e.target.value)}
+                    className="w-full border border-gray-200 bg-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900 transition-all"
+                  />
+                </div>
+
+                {/* ATTRIBUTE RAW VALUES CONTAINER */}
+                <div className="md:col-span-7 space-y-1">
+                  <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                    Values (Comma Separated)
+                  </span>
+                  <input
+                    placeholder="e.g., 128GB, 256GB, 512GB"
+                    value={attr.values.join(", ")}
+                    onChange={(e) => handleValuesInput(index, e.target.value)}
+                    className="w-full border border-gray-200 bg-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900 transition-all"
+                  />
+                </div>
+
+                {/* TRASH ROW DELETION */}
+                <div className="md:col-span-1 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={attributes.length === 1}
+                    onClick={() => removeAttributeField(index)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent rounded-lg transition-colors border border-transparent md:mb-0.5"
+                    title="Remove field"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* ACTIONS & TOP SAVE BUTTON (FOR MOBILE) */}
+        {/* COMBINATION TRIGGER ACTIONS */}
         <div className="flex flex-col sm:flex-row gap-3 pt-1">
           <button
             onClick={generateVariants}
             className="w-full sm:w-auto bg-zinc-950 hover:bg-zinc-800 text-white font-medium px-4 py-2.5 rounded-lg text-sm shadow-sm transition-all flex items-center justify-center gap-2"
           >
-            <Layers size={15} /> Auto Generate
+            <Layers size={15} /> Auto-Generate Matrices
           </button>
 
           <button
             onClick={addVariant}
             className="w-full sm:w-auto border border-gray-200 hover:bg-gray-50 text-zinc-700 font-medium px-4 py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
           >
-            <Plus size={15} /> Manual Add
+            <Plus size={15} /> Manual Add Row
           </button>
 
-          {/* ⚡ Mobile-only Save Button (Hidden on Desktop) */}
           <div className="block md:hidden pt-2 border-t border-gray-100 mt-2">
             <SaveButton />
           </div>
         </div>
 
-        {/* VARIANTS LIST */}
+        {/* COMPILING GENERATED RESULTS MATRIX */}
         {variants.length > 0 && (
           <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            {/* Table Headers - Hidden on Mobile */}
+            {/* Table Dynamic Headers - Adapts layout automatically */}
             <div className="hidden md:grid grid-cols-12 gap-3 bg-gray-50 px-4 py-2.5 border-b border-gray-200 text-xs font-semibold text-zinc-600 uppercase tracking-wider">
-              <div className="col-span-3">Attributes</div>
-              <div className="col-span-3">SKU</div>
+              <div className="col-span-4">Generated Option Badges</div>
+              <div className="col-span-3">SKU Identifier</div>
               <div className="col-span-3">Price ($)</div>
-              <div className="col-span-3">Stock</div>
+              <div className="col-span-2">Stock</div>
             </div>
 
             {/* List Rows */}
@@ -190,20 +270,22 @@ export default function VariantBuilderPage({
                   key={v.id}
                   className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors"
                 >
-                  {/* OPTIONS BADGES */}
-                  <div className="col-span-3 flex flex-wrap gap-1 w-full">
+                  {/* DYNAMIC OPTION CHIPS */}
+                  <div className="col-span-4 flex flex-wrap gap-1 w-full">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-0.5 w-full">
-                      Attributes
+                      Attributes Mapping
                     </span>
                     {Object.keys(v.options).length === 0 ? (
-                      <span className="text-xs text-gray-400 italic">Custom</span>
+                      <span className="text-xs text-gray-400 italic flex items-center gap-1">
+                        <HelpCircle size={12} /> Custom Row
+                      </span>
                     ) : (
                       Object.entries(v.options).map(([key, val]) => (
-                        <span 
-                          key={key} 
+                        <span
+                          key={key}
                           className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50"
                         >
-                          {val}
+                          <strong className="text-zinc-500 font-normal">{key}:</strong> {val}
                         </span>
                       ))
                     )}
@@ -215,7 +297,7 @@ export default function VariantBuilderPage({
                       SKU
                     </span>
                     <input
-                      placeholder="e.g. TSHIRT-S-RED"
+                      placeholder="e.g. ELECTRONIC-128GB"
                       value={v.sku}
                       onChange={(e) => updateVariant(v.id, "sku", e.target.value)}
                       className="w-full border border-gray-200 px-3 py-2 md:px-2.5 md:py-1.5 rounded-md text-xs font-mono uppercase focus:ring-1 focus:ring-zinc-900 focus:outline-none"
@@ -241,8 +323,8 @@ export default function VariantBuilderPage({
                     </div>
                   </div>
 
-                  {/* STOCK + DELETE */}
-                  <div className="col-span-3 flex gap-3 items-end md:items-center w-full">
+                  {/* STOCK & ACTION ROW */}
+                  <div className="col-span-2 flex gap-3 items-end md:items-center w-full">
                     <div className="relative w-full">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-1">
                         Stock
@@ -282,7 +364,9 @@ export default function VariantBuilderPage({
 
         {variants.length === 0 && (
           <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl px-4">
-            <p className="text-sm text-gray-400">No variants generated yet. Enter options above or add manually.</p>
+            <p className="text-sm text-gray-400">
+              No variants compiled yet. Define dynamic custom attributes above, or add a standard manual variation row.
+            </p>
           </div>
         )}
 
