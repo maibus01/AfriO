@@ -328,3 +328,102 @@ export default function VariantBuilderPage({
               <div className="col-span-3">SKU Identifier</div>
               <div className="col-span-3">Price ($)</div>
               <div className="col-span-2">Stock</div>
+            </div>
+
+            <div className="divide-y divide-gray-100 max-h-[350px] overflow-y-auto bg-gray-50 md:bg-white">
+              {variants.map((v) => (
+                <div key={v.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors">
+                  
+                  {/* Dynamic Chip Mapping */}
+                  <div className="col-span-4 flex flex-wrap gap-1 w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-0.5 w-full">Attributes Mapping</span>
+                    {Object.keys(v.options).length === 0 ? (
+                      <span className="text-xs text-gray-400 italic flex items-center gap-1">
+                        <HelpCircle size={12} /> Custom Row
+                      </span>
+                    ) : (
+                      Object.entries(v.options).map(([key, val]) => (
+                        <span key={key} className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
+                          <strong className="text-zinc-500 font-normal">{key}:</strong> {val}
+                        </span>
+                      ))
+                    )}
+                  </div>
+
+                  {/* SKU */}
+                  <div className="col-span-3 w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-1">SKU</span>
+                    <input
+                      placeholder="e.g. ITEM-XL"
+                      value={v.sku}
+                      onChange={(e) => updateVariant(v.id, "sku", e.target.value)}
+                      className="w-full border border-gray-200 px-3 py-2 md:px-2.5 md:py-1.5 rounded-md text-xs font-mono uppercase focus:ring-1 focus:ring-zinc-900 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* PRICE */}
+                  <div className="col-span-3 relative w-full">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-1">Price</span>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400">
+                        <DollarSign size={12} />
+                      </div>
+                      <input
+                        type="number"
+                        placeholder="0.00"
+                        value={v.price || ""}
+                        onChange={(e) => updateVariant(v.id, "price", Number(e.target.value))}
+                        className="w-full border border-gray-200 pl-6 pr-2.5 py-2 md:py-1.5 rounded-md text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* STOCK & DELETE */}
+                  <div className="col-span-2 flex gap-3 items-end md:items-center w-full">
+                    <div className="relative w-full">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block md:hidden mb-1">Stock</span>
+                      <div className="relative">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400">
+                          <Package size={12} />
+                        </div>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={v.stock || ""}
+                          onChange={(e) => updateVariant(v.id, "stock", Number(e.target.value))}
+                          className="w-full border border-gray-200 pl-6 pr-2.5 py-2 md:py-1.5 rounded-md text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col justify-end">
+                      <button
+                        onClick={() => removeVariant(v.id)}
+                        className="p-2 md:p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors border border-gray-100 md:border-none flex items-center justify-center bg-gray-50 md:bg-transparent"
+                        title="Remove variant"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* BOTTOM SAVE ACTION */}
+        {variants.length === 0 && (
+          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl px-4">
+            <p className="text-sm text-gray-400">No variants compiled yet. Toggle preset options above, add details, and generate.</p>
+          </div>
+        )}
+
+        <div className="hidden md:block pt-2">
+          <SaveButton />
+        </div>
+      </div>
+    </div>
+  );
+}
