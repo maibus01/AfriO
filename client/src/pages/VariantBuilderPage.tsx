@@ -45,11 +45,12 @@ export default function VariantBuilderPage({
   
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // ⚡ PRODUCT TYPE TEMPLATE ENFORCER
+  // ⚡ PRODUCT TYPE TEMPLATE ENFORCER (Fixed: Now resets all input strings cleanly)
   const handleProductTypeChange = (type: ProductType) => {
     setProductType(type);
     setVariants([]); 
     setAttributeImages({});
+    setInputValue({}); // Clears input tracking row data entirely
     setErrorMessage(null);
 
     switch (type) {
@@ -95,14 +96,18 @@ export default function VariantBuilderPage({
       });
     }
     setAttributes((prev) => prev.filter((_, i) => i !== index));
-    const newInputs = { ...inputValue };
-    delete newInputs[index];
-    setInputValue(newInputs);
+    setInputValue((prev) => {
+      const newInputs = { ...prev };
+      delete newInputs[index];
+      return newInputs;
+    });
     setErrorMessage(null);
   };
 
   const updateAttributeName = (index: number, name: string) => {
     const oldName = attributes[index].name;
+    const currentValues = attributes[index].values; // Capture values locally immediately
+    
     setAttributes((prev) =>
       prev.map((attr, i) => (i === index ? { ...attr, name } : attr))
     );
@@ -110,7 +115,7 @@ export default function VariantBuilderPage({
     if (oldName && oldName !== name) {
       setAttributeImages(prev => {
         const updated = { ...prev };
-        attributes[index].values.forEach(val => {
+        currentValues.forEach(val => {
           if (updated[`${oldName}:${val}`]) {
             updated[`${name}:${val}`] = updated[`${oldName}:${val}`];
             delete updated[`${oldName}:${val}`];
@@ -168,12 +173,11 @@ export default function VariantBuilderPage({
     setErrorMessage(null);
   };
 
-  // 📸 LOCAL IMAGE UPLOAD HANDLER (INSTANT PREVIEW STRATEGY)
+  // 📸 LOCAL IMAGE UPLOAD HANDLER
   const handleImageUpload = (attrName: string, value: string, e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Convert directly to local blob URL for layout rendering
     const localBlobUrl = URL.createObjectURL(file);
     const compositeKey = `${attrName}:${value}`;
 

@@ -627,26 +627,25 @@ export const addVariant = async (req: any, res: any, next: any) => {
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
+      return res.status(404).json({ success: false, message: "Product not found" });
     }
 
-    // 🔐 ownership check
     if (product.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized",
-      });
+      return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // 📸 upload image (if exists)
-    let imageUrl = "";
+    // 📸 unified images handling
+    let imageUrls: string[] = [];
 
-    if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer);
-      imageUrl = result.secure_url;
+    if (req.files && Array.isArray(req.files)) {
+      const uploads = await Promise.all(
+        req.files.map(async (file: any) => {
+          const result = await uploadToCloudinary(file.buffer);
+          return result.secure_url;
+        })
+      );
+
+      imageUrls = uploads;
     }
 
     // 🧠 parse options safely
@@ -655,27 +654,24 @@ export const addVariant = async (req: any, res: any, next: any) => {
         ? JSON.parse(req.body.options)
         : req.body.options;
 
-    // 🔥 AUTO SKU GENERATION
+    // 🔥 SKU generation
     const skuSuffix = Object.values(options || {})
       .join("-")
       .replace(/\s+/g, "")
       .toUpperCase();
 
-    const sku = `${product.name
-      .substring(0, 3)
-      .toUpperCase()}-${skuSuffix || Date.now()}`;
+    const sku = `${product.name.substring(0, 3).toUpperCase()}-${skuSuffix || Date.now()}`;
 
-    // 🧩 create variant
+    // 🧩 variant
     const newVariant = {
       id: new mongoose.Types.ObjectId().toString(),
       sku,
       options,
       price: Number(req.body.price || 0),
       stock: Number(req.body.stock || 0),
-      images: imageUrl ? [imageUrl] : [], // ✅ matches your type
+      images: imageUrls, // ✅ ALWAYS array
     };
 
-    // 📦 push into product
     product.variants = product.variants || [];
     product.variants.push(newVariant);
 
