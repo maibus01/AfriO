@@ -97,15 +97,15 @@ export default function VariantBuilderPage({
   ]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [inputValue, setInputValue] = useState<Record<number, string>>({});
-  
+
   // Split State Tracking System (UI Previews vs. Binary Upload Payloads)
   const [attributeFiles, setAttributeFiles] = useState<AttributeFiles>({});
   const [attributeImages, setAttributeImages] = useState<Record<string, string>>({});
-  
+
   const [showOverwiteWarning, setShowOverwriteWarning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // ⚡ PRODUCT TYPE TEMPLATE ENFORCER
@@ -176,11 +176,11 @@ export default function VariantBuilderPage({
   const updateAttributeName = (index: number, name: string) => {
     const oldName = attributes[index].name;
     const currentValues = attributes[index].values;
-    
+
     setAttributes((prev) =>
       prev.map((attr, i) => (i === index ? { ...attr, name } : attr))
     );
-    
+
     if (oldName && oldName !== name) {
       setAttributeFiles(prev => {
         const updated = { ...prev };
@@ -217,7 +217,7 @@ export default function VariantBuilderPage({
       e.preventDefault();
       const value = inputValue[index]?.trim();
       const attrName = attributes[index].name.trim();
-      
+
       if (!value || !attrName) return;
       if (attributes[index].values.includes(value)) {
         setInputValue((prev) => ({ ...prev, [index]: "" }));
@@ -237,7 +237,7 @@ export default function VariantBuilderPage({
   const removeValueTag = (attrIndex: number, valueIndex: number) => {
     const attrName = attributes[attrIndex].name;
     const valToRemove = attributes[attrIndex].values[valueIndex];
-    
+
     setAttributeFiles(prev => {
       const updated = { ...prev };
       delete updated[`${attrName}:${valToRemove}`];
@@ -285,7 +285,7 @@ export default function VariantBuilderPage({
   const removeImage = (attrName: string, value: string, e: MouseEvent) => {
     e.stopPropagation();
     const compositeKey = `${attrName}:${value}`;
-    
+
     setAttributeFiles(prev => {
       const updated = { ...prev };
       delete updated[compositeKey];
@@ -296,6 +296,17 @@ export default function VariantBuilderPage({
       delete updated[compositeKey];
       return updated;
     });
+  };
+
+  // ✅ IMAGE COMPILATION HELPER
+  const resolveVariantImages = (combo: Record<string, string>) => {
+    const images: string[] = [];
+    Object.entries(combo).forEach(([key, value]) => {
+      const compositeKey = `${key}:${value}`;
+      const image = attributeImages[compositeKey];
+      if (image) images.push(image);
+    });
+    return images;
   };
 
   // ⚡ RECURSIVE CARTESIAN ENGINE
@@ -349,14 +360,22 @@ export default function VariantBuilderPage({
         Object.entries(combo).every(([k, val]) => v.options[k] === val)
       );
 
-      if (existingMatch) return existingMatch; 
-        
+      // If variant existed previously, make sure we append images if they were missing
+      if (existingMatch) {
+        return {
+          ...existingMatch,
+          images: existingMatch.images?.length ? existingMatch.images : resolveVariantImages(combo)
+        };
+      } 
+
+      // ✅ FIX: Injecting images directly during compilation mapping
       return {
         id: `var-${Date.now()}-${i}`,
         sku: generatedSku,
         options: combo,
         price: basePrice || 0,
         stock: 10,
+        images: resolveVariantImages(combo),
       };
     });
 
@@ -366,7 +385,7 @@ export default function VariantBuilderPage({
   const addVariant = () => {
     setVariants((prev) => [
       ...prev,
-      { id: `var-${Date.now()}`, sku: "", options: {}, price: basePrice || 0, stock: 0 },
+      { id: `var-${Date.now()}`, sku: "", options: {}, price: basePrice || 0, stock: 0, images: [] },
     ]);
   };
 
@@ -386,7 +405,6 @@ export default function VariantBuilderPage({
     setIsSaving(true);
     setErrorMessage(null);
     try {
-      // 🔥 CRITICAL FIX: Capture a stable object copy of your attributeFiles
       const filesSnapshot = { ...attributeFiles };
 
       // Pass state payloads back to Parent Context cleanly
@@ -401,7 +419,7 @@ export default function VariantBuilderPage({
 
   return (
     <div className="max-w-4xl mx-4 sm:mx-6 md:mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 my-6 flex flex-col overflow-hidden">
-      
+
       {/* HEADER */}
       <div className="px-4 py-4 sm:px-6 bg-gray-50 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -417,7 +435,7 @@ export default function VariantBuilderPage({
       </div>
 
       <div className="p-4 sm:p-6 space-y-6 overflow-y-auto max-h-[calc(100vh-120px)]">
-        
+
         {errorMessage && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-xs flex gap-3 items-center">
             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -475,7 +493,7 @@ export default function VariantBuilderPage({
 
           {attributes.map((attr, index) => (
             <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/40 border border-gray-100 rounded-xl items-start">
-              
+
               <div className="md:col-span-3 space-y-2">
                 <div>
                   <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wide block mb-1">Label Name</span>
@@ -503,12 +521,12 @@ export default function VariantBuilderPage({
                 <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
                   Values (Type value and press <kbd className="bg-gray-200 px-1 rounded text-[10px] font-mono font-bold text-gray-600">Enter</kbd>)
                 </span>
-                
+
                 <div className="w-full border border-gray-200 bg-white p-1.5 rounded-lg flex flex-wrap gap-2 items-center min-h-[44px] focus-within:ring-1 focus-within:ring-zinc-900 transition-all">
                   {attr.values.map((val, vIdx) => {
                     const compositeKey = `${attr.name}:${val}`;
                     const hasImage = !!attributeImages[compositeKey];
-                    
+
                     return (
                       <span
                         key={vIdx}
@@ -525,7 +543,7 @@ export default function VariantBuilderPage({
                               onChange={(e) => handleImageUpload(attr.name, val, e)}
                               className="hidden"
                             />
-                            
+
                             {hasImage ? (
                               <div className="w-4 h-4 rounded bg-cover bg-center relative border border-black/10" style={{ backgroundImage: `url(${attributeImages[compositeKey]})` }}>
                                 {!isSaving && (
@@ -560,7 +578,7 @@ export default function VariantBuilderPage({
                       </span>
                     );
                   })}
-                  
+
                   <input
                     placeholder={attr.values.length === 0 ? "Type option value..." : ""}
                     value={inputValue[index] || ""}
@@ -638,20 +656,20 @@ export default function VariantBuilderPage({
             <div className="divide-y divide-gray-100 max-h-[350px] overflow-y-auto bg-gray-50 md:bg-white">
               {variants.map((v) => (
                 <div key={v.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors">
-                  
+
                   <div className="col-span-4 flex flex-wrap gap-1 w-full">
                     {Object.entries(v.options).map(([key, val]) => {
-                      const compositeKey = `${key}:${val}`;
-                      const hasImg = !!attributeImages[compositeKey];
-                      return (
-                        <span key={key} className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
-                          {hasImg && (
-                            <div className="w-3 h-3 rounded bg-cover bg-center border border-black/10" style={{ backgroundImage: `url(${attributeImages[compositeKey]})` }} />
-                          )}
-                          <span>{key}: {val}</span>
-                        </span>
-                      );
-                    })}
+  const compositeKey = `${key}:${val}`; //  Fixed to 'val'
+  const hasImg = !!attributeImages[compositeKey];
+  return (
+    <span key={key} className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
+      {hasImg && (
+        <div className="w-3 h-3 rounded bg-cover bg-center border border-black/10" style={{ backgroundImage: `url(${attributeImages[compositeKey]})` }} />
+      )}
+      <span>{key}: {val}</span> //  Fixed to 'val'
+    </span>
+  );
+})}
                   </div>
 
                   <div className="col-span-3 w-full">
