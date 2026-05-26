@@ -259,6 +259,7 @@ import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import { Product } from "../models/Product";
 import { Business } from "../models/Business";
+import { uploadToCloudinary } from "../utils/cloudinaryUpload";
 
 
 // =========================
@@ -297,7 +298,6 @@ export const createProduct = async (
       description,
       basePrice,
       currency,
-      images,
       category,
       stock,
       businessId,
@@ -326,12 +326,17 @@ export const createProduct = async (
       });
     }
 
-    // ⚠️ optional now (since only your team uses it)
-    if (business.category !== "vendor") {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid business type",
-      });
+    // 📸 IMAGE UPLOAD (THIS IS THE IMPORTANT PART)
+    let imageUrls: string[] = [];
+
+    if (req.files && Array.isArray(req.files)) {
+      const uploadResults = await Promise.all(
+        req.files.map((file: any) =>
+          uploadToCloudinary(file.buffer)
+        )
+      );
+
+      imageUrls = uploadResults.map((r) => r.secure_url);
     }
 
     const product = await Product.create({
@@ -339,15 +344,15 @@ export const createProduct = async (
       description,
       basePrice,
       currency,
-      images,
       category,
       stock,
       businessId,
       ownerId: req.user.id,
 
-      features,
-      attributes,
-      variants,
+      images: imageUrls, // 👈 IMPORTANT
+      features: typeof features === "string" ? JSON.parse(features) : features,
+      attributes: typeof attributes === "string" ? JSON.parse(attributes) : attributes,
+      variants: typeof variants === "string" ? JSON.parse(variants) : variants,
       measurement,
       bulkPricing,
       origin,
@@ -454,7 +459,7 @@ export const getProductsByBusiness = async (req: Request, res: Response, next: N
 // =========================
 // UPDATE PRODUCT (SAFE PATCH)
 // =========================
-export const updateProduct = async (req: Request, res: Response, next: NextFunction) => {
+export const updateProduct = async (req: any, res: Response, next: NextFunction) => {
   try {
     const product = await Product.findById(req.params.id);
 
@@ -472,10 +477,29 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       });
     }
 
+    // 📸 1. Handle NEW image uploads (Cloudinary)
+    let newImageUrls: string[] = [];
+
+    if (req.files && req.files.length > 0) {
+      const uploaded = await Promise.all(
+        req.files.map((file: any) => uploadToCloudinary(file.buffer))
+      );
+
+      newImageUrls = uploaded.map((r) => r.secure_url);
+    }
+
+    // 🧠 2. Merge or replace logic
+    const existingImages = product.images || [];
+
+    const finalImages =
+      newImageUrls.length > 0
+        ? newImageUrls // replace mode
+        : existingImages; // keep old
+
+    // ⚙️ 3. Update allowed fields safely
     const allowedFields = [
       "name",
       "description",
-      "images",
       "category",
       "basePrice",
       "currency",
@@ -490,9 +514,15 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
 
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
-        (product as any)[field] = req.body[field];
+        (product as any)[field] =
+          typeof req.body[field] === "string"
+            ? JSON.parse(req.body[field])
+            : req.body[field];
       }
     });
+
+    // 📸 4. Set final images separately (IMPORTANT)
+    product.images = finalImages;
 
     await product.save();
 
@@ -500,6 +530,7 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       success: true,
       data: product,
     });
+
   } catch (err) {
     next(err);
   }
@@ -577,31 +608,68 @@ export const getAllProducts = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const addVariant = async (req: Request, res: Response, next: NextFunction) => {
+export const addVariant = async (req: any, res: any, next: any) => {
   try {
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
     }
 
+    // 🔐 ownership check
     if (product.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
     }
 
+    // 📸 upload image (if exists)
+    let imageUrl = "";
+
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer);
+      imageUrl = result.secure_url;
+    }
+
+    // 🧠 parse options safely
+    const options =
+      typeof req.body.options === "string"
+        ? JSON.parse(req.body.options)
+        : req.body.options;
+
+    // 🔥 AUTO SKU GENERATION
+    const skuSuffix = Object.values(options || {})
+      .join("-")
+      .replace(/\s+/g, "")
+      .toUpperCase();
+
+    const sku = `${product.name
+      .substring(0, 3)
+      .toUpperCase()}-${skuSuffix || Date.now()}`;
+
+    // 🧩 create variant
     const newVariant = {
       id: new mongoose.Types.ObjectId().toString(),
-      ...req.body,
+      sku,
+      options,
+      price: Number(req.body.price || 0),
+      stock: Number(req.body.stock || 0),
+      images: imageUrl ? [imageUrl] : [], // ✅ matches your type
     };
 
+    // 📦 push into product
     product.variants = product.variants || [];
     product.variants.push(newVariant);
 
     await product.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Variant added",
+      message: "Variant added successfully",
       data: product,
     });
   } catch (err) {

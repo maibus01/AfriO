@@ -146,6 +146,7 @@ import {
 } from "../controllers/productController";
 
 import { protect, restrictTo } from "../middleware/authMiddleware";
+import upload from "../middleware/upload";
 
 const router = express.Router();
 
@@ -185,9 +186,10 @@ router.get("/", getAllProducts);
 // ==========================================
 // 3. VENDOR ACTION ROUTES
 // ==========================================
-router.post("/", protect, restrictTo("user"), createProduct);
 
-router.patch("/:id", protect, restrictTo("user"), updateProduct);
+router.post("/", protect, restrictTo("user"), upload.array("images", 10), createProduct);
+
+router.patch("/:id", protect, restrictTo("user"), upload.array("images", 10), updateProduct);
 
 router.delete("/:id", protect, restrictTo("user"), deleteProduct);
 
@@ -199,6 +201,7 @@ router.post(
   "/:id/variants",
   protect,
   restrictTo("vendor"),
+  upload.single("image"), // 👈 IMPORTANT
   addVariant
 );
 
