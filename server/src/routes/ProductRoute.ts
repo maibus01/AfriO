@@ -201,7 +201,7 @@ router.post(
   "/:id/variants",
   protect,
   restrictTo("user"),
-  upload.single("image"), // 👈 IMPORTANT
+  upload.array("image", 10), // 👈 IMPORTANT
   addVariant
 );
 
