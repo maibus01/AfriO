@@ -10,6 +10,7 @@ type Variant = {
   options: Record<string, string>;
   price: number;
   stock: number;
+  images?: string[];
 };
 
 type AttributeFiles = Record<string, File>;
