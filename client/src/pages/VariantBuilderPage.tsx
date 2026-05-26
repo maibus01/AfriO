@@ -1,5 +1,5 @@
-import { useState, KeyboardEvent } from "react";
-import { Trash2, Plus, Sliders, Layers, DollarSign, Package, X, HelpCircle, Check } from "lucide-react";
+import { useState, KeyboardEvent, useRef } from "react";
+import { Trash2, Plus, Sliders, Layers, DollarSign, Package, X, HelpCircle, Check, Image as ImageIcon } from "lucide-react";
 
 type Variant = {
   id: string;
@@ -17,11 +17,10 @@ interface Attribute {
 interface Props {
   baseName: string;
   basePrice: number;
-  onSave: (variants: Variant[]) => void;
+  onSave: (variants: Variant[], attributeImages: Record<string, string>) => void; // Expanded to return images map
   onClose: () => void;
 }
 
-// Quick presets for the toggle buttons
 const PRESETS = ["Size", "Color", "Storage", "Material"];
 
 export default function VariantBuilderPage({
@@ -34,30 +33,38 @@ export default function VariantBuilderPage({
     { name: "Color", values: [] },
   ]);
   const [variants, setVariants] = useState<Variant[]>([]);
-  // Local state to track what the user is typing in each attribute's value field
   const [inputValue, setInputValue] = useState<Record<number, string>>({});
+  
+  // 📸 Maps a specific attribute value to an image URL/DataString (e.g., "Red" -> "data:image...")
+  const [attributeImages, setAttributeImages] = useState<Record<string, string>>({});
+  
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // 🎛️ PRESET TOGGLE HANDLER
   const togglePreset = (presetName: string) => {
     const exists = attributes.some((attr) => attr.name.toLowerCase() === presetName.toLowerCase());
-    
     if (exists) {
-      // If it exists, remove it
       setAttributes((prev) => prev.filter((attr) => attr.name.toLowerCase() !== presetName.toLowerCase()));
     } else {
-      // If it doesn't exist, append it
       setAttributes((prev) => [...prev, { name: presetName, values: [] }]);
     }
   };
 
-  // 🛠️ ATTRIBUTE MANAGEMENT HANDLERS
   const addCustomAttribute = () => {
     setAttributes((prev) => [...prev, { name: "", values: [] }]);
   };
 
   const removeAttributeField = (index: number) => {
+    const attrToRemove = attributes[index];
+    // Clean up images tied to deleted attribute values
+    if (attrToRemove) {
+      setAttributeImages(prev => {
+        const updated = { ...prev };
+        attrToRemove.values.forEach(val => delete updated[val]);
+        return updated;
+      });
+    }
     setAttributes((prev) => prev.filter((_, i) => i !== index));
-    // Clean up temporary input state for this index
     const newInputs = { ...inputValue };
     delete newInputs[index];
     setInputValue(newInputs);
@@ -69,15 +76,13 @@ export default function VariantBuilderPage({
     );
   };
 
-  // 🏷️ ENTER-KEY TAG SYSTEM (No Commas Needed)
+  // 🏷️ ENTER-KEY TAG SYSTEM
   const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       const value = inputValue[index]?.trim();
       
       if (!value) return;
-
-      // Don't add duplicate values to the same attribute
       if (attributes[index].values.includes(value)) {
         setInputValue((prev) => ({ ...prev, [index]: "" }));
         return;
@@ -88,13 +93,18 @@ export default function VariantBuilderPage({
           i === index ? { ...attr, values: [...attr.values, value] } : attr
         )
       );
-
-      // Reset just this row's input field
       setInputValue((prev) => ({ ...prev, [index]: "" }));
     }
   };
 
   const removeValueTag = (attrIndex: number, valueIndex: number) => {
+    const valToRemove = attributes[attrIndex].values[valueIndex];
+    setAttributeImages(prev => {
+      const updated = { ...prev };
+      delete updated[valToRemove];
+      return updated;
+    });
+
     setAttributes((prev) =>
       prev.map((attr, i) =>
         i === attrIndex
@@ -102,6 +112,34 @@ export default function VariantBuilderPage({
           : attr
       )
     );
+  };
+
+  // 📸 IMAGE UPLOAD HANDLER
+  const handleImageUpload = (value: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Convert file to local preview string (In production, replace with your cloud upload logic)
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        setAttributeImages(prev => ({ ...prev, [value]: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const triggerFileInput = (value: string) => {
+    fileInputRefs.current[value]?.click();
+  };
+
+  const removeImage = (value: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAttributeImages(prev => {
+      const updated = { ...prev };
+      delete updated[value];
+      return updated;
+    });
   };
 
   // ⚡ RECURSIVE CARTESIAN ENGINE
@@ -166,7 +204,7 @@ export default function VariantBuilderPage({
 
   const SaveButton = () => (
     <button
-      onClick={() => onSave(variants)}
+      onClick={() => onSave(variants, attributeImages)}
       disabled={variants.length === 0}
       className={`w-full font-medium py-3 rounded-lg text-sm transition-all shadow-sm ${
         variants.length === 0
@@ -187,7 +225,7 @@ export default function VariantBuilderPage({
           <Sliders className="text-zinc-700 w-5 h-5 flex-shrink-0" />
           <div>
             <h2 className="text-base sm:text-lg font-semibold text-zinc-900">Universal Variant Engine</h2>
-            <p className="text-xs text-gray-500">Toggle presets or add custom configuration attributes</p>
+            <p className="text-xs text-gray-500">Toggle presets, upload attribute media assets, and build configurations</p>
           </div>
         </div>
         <button onClick={onClose} className="p-1.5 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded-lg transition-colors">
@@ -254,23 +292,54 @@ export default function VariantBuilderPage({
                   Values (Type value and press <kbd className="bg-gray-200 px-1 rounded text-[10px] font-mono font-bold text-gray-600">Enter</kbd>)
                 </span>
                 
-                <div className="w-full border border-gray-200 bg-white p-1.5 rounded-lg flex flex-wrap gap-1.5 items-center min-h-[40px] focus-within:ring-1 focus-within:ring-zinc-900 transition-all">
-                  {/* Generated Tags */}
-                  {attr.values.map((val, vIdx) => (
-                    <span
-                      key={vIdx}
-                      className="inline-flex items-center gap-1 text-xs bg-zinc-100 text-zinc-800 px-2 py-1 rounded-md border border-zinc-200/60 font-medium"
-                    >
-                      {val}
-                      <button
-                        type="button"
-                        onClick={() => removeValueTag(index, vIdx)}
-                        className="text-gray-400 hover:text-zinc-900 p-0.5 rounded"
+                <div className="w-full border border-gray-200 bg-white p-1.5 rounded-lg flex flex-wrap gap-2 items-center min-h-[44px] focus-within:ring-1 focus-within:ring-zinc-900 transition-all">
+                  {/* Generated Tags with Integrated Media Thumbnail */}
+                  {attr.values.map((val, vIdx) => {
+                    const hasImage = !!attributeImages[val];
+                    return (
+                      <span
+                        key={vIdx}
+                        onClick={() => triggerFileInput(val)}
+                        className="inline-flex items-center gap-1.5 text-xs bg-zinc-100 hover:bg-zinc-200/80 cursor-pointer text-zinc-800 pl-1.5 pr-2 py-1 rounded-md border border-zinc-200/60 font-medium transition-colors relative group"
                       >
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
+                        {/* Hidden Input field specifically targeting this string wrapper value */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={el => { fileInputRefs.current[val] = el; }}
+                          onChange={(e) => handleImageUpload(val, e)}
+                          className="hidden"
+                        />
+                        
+                        {/* Interactive Thumbnail Indicator */}
+                        {hasImage ? (
+                          <div className="w-4 h-4 rounded bg-cover bg-center relative border border-black/10" style={{ backgroundImage: `url(${attributeImages[val]})` }}>
+                            <div 
+                              onClick={(e) => removeImage(val, e)}
+                              className="absolute -top-1.5 -right-1.5 bg-zinc-950 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 scale-75 hover:bg-red-600 transition-all"
+                            >
+                              <X size={8} />
+                            </div>
+                          </div>
+                        ) : (
+                          <ImageIcon size={12} className="text-gray-400 group-hover:text-zinc-600 transition-colors" />
+                        )}
+
+                        {val}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeValueTag(index, vIdx);
+                          }}
+                          className="text-gray-400 hover:text-zinc-900 p-0.5 rounded"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    );
+                  })}
                   
                   {/* Seamless Input Field */}
                   <input
@@ -342,11 +411,17 @@ export default function VariantBuilderPage({
                         <HelpCircle size={12} /> Custom Row
                       </span>
                     ) : (
-                      Object.entries(v.options).map(([key, val]) => (
-                        <span key={key} className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
-                          <strong className="text-zinc-500 font-normal">{key}:</strong> {val}
-                        </span>
-                      ))
+                      Object.entries(v.options).map(([key, val]) => {
+                        const hasImg = !!attributeImages[val];
+                        return (
+                          <span key={key} className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
+                            {hasImg && (
+                              <div className="w-3 h-3 rounded bg-cover bg-center border border-black/10" style={{ backgroundImage: `url(${attributeImages[val]})` }} />
+                            )}
+                            <strong className="text-zinc-500 font-normal">{key}:</strong> {val}
+                          </span>
+                        );
+                      })
                     )}
                   </div>
 
