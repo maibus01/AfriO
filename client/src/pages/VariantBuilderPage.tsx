@@ -10,7 +10,7 @@ type Variant = {
   options: Record<string, string>;
   price: number;
   stock: number;
-  images?: string[];
+  images?: File[];
 };
 
 type AttributeFiles = Record<string, File>;
@@ -22,18 +22,21 @@ interface Attribute {
 }
 
 interface Props {
-  productId: string; 
+  productId: string;
   baseName: string;
   basePrice: number;
   onClose: () => void;
-  onSave: (generatedVariants: Variant[], attributeFiles: AttributeFiles) => Promise<void> | void; 
+  onSave: (generatedVariants: Variant[], attributeFiles: AttributeFiles) => Promise<void> | void;
   onSuccess?: () => void;
 }
+
+const API = "https://afrio-api.onrender.com/api";
 
 type ProductType = "clothing" | "phone" | "electronics" | "custom";
 
 const VARIANT_LIMIT = 200;
 
+// --- 🔥 INTEGRATED API SAVE BRIDGE (FormData Multi-part Layer) ---
 // --- 🔥 INTEGRATED API SAVE BRIDGE (FormData Multi-part Layer) ---
 export const saveVariantsToDB = async (
   productId: string,
@@ -51,23 +54,23 @@ export const saveVariantsToDB = async (
         formData.append("stock", String(variant.stock));
         formData.append("options", JSON.stringify(variant.options));
 
-        // 📸 Match files for this variant's active options selection directly
+        // 📸 Upload matching attribute images
         Object.entries(variant.options).forEach(([key, value]) => {
           const fileKey = `${key}:${value}`;
           const file = attributeFiles[fileKey];
 
           if (file) {
-            // Must match backend multer target exactly: upload.array("images")
-            formData.append("images", file); 
+            formData.append("images", file);
           }
         });
 
-        // 🚀 Multi-part Stream Post
+        // 🚀 Save variant
         await axios.post(
-          `/products/${productId}/variants`,
+          `${API}/products/${productId}/variants`,
           formData,
           {
             headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
               "Content-Type": "multipart/form-data",
             },
           }
@@ -81,7 +84,6 @@ export const saveVariantsToDB = async (
     throw err;
   }
 };
-
 // --- MAIN COMPONENT ENGINE ---
 export default function VariantBuilderPage({
   productId,
@@ -111,9 +113,9 @@ export default function VariantBuilderPage({
   // ⚡ PRODUCT TYPE TEMPLATE ENFORCER
   const handleProductTypeChange = (type: ProductType) => {
     setProductType(type);
-    setVariants([]); 
+    setVariants([]);
     setAttributeImages({});
-    setAttributeFiles({}); 
+    setAttributeFiles({});
     setInputValue({});
     setErrorMessage(null);
 
@@ -206,7 +208,7 @@ export default function VariantBuilderPage({
   };
 
   const toggleImageSupport = (index: number) => {
-    setAttributes(prev => 
+    setAttributes(prev =>
       prev.map((attr, i) => i === index ? { ...attr, hasImage: !attr.hasImage } : attr)
     );
   };
@@ -299,15 +301,20 @@ export default function VariantBuilderPage({
   };
 
   // ✅ IMAGE COMPILATION HELPER
-  const resolveVariantImages = (combo: Record<string, string>) => {
-    const images: string[] = [];
-    Object.entries(combo).forEach(([key, value]) => {
-      const compositeKey = `${key}:${value}`;
-      const image = attributeImages[compositeKey];
-      if (image) images.push(image);
-    });
-    return images;
-  };
+ const resolveVariantImages = (combo: Record<string, string>) => {
+  const images: File[] = [];
+
+  Object.entries(combo).forEach(([key, value]) => {
+    const compositeKey = `${key}:${value}`;
+    const file = attributeFiles[compositeKey];
+
+    if (file) {
+      images.push(file);
+    }
+  });
+
+  return images;
+};
 
   // ⚡ RECURSIVE CARTESIAN ENGINE
   const handleGenerationClick = () => {
@@ -355,7 +362,7 @@ export default function VariantBuilderPage({
       const prefix = baseName ? baseName.substring(0, 3).toUpperCase() : "GEN";
       const generatedSku = `${prefix}-${skuSuffix}`;
 
-      const existingMatch = variants.find(v => 
+      const existingMatch = variants.find(v =>
         Object.keys(combo).length === Object.keys(v.options).length &&
         Object.entries(combo).every(([k, val]) => v.options[k] === val)
       );
@@ -366,7 +373,7 @@ export default function VariantBuilderPage({
           ...existingMatch,
           images: existingMatch.images?.length ? existingMatch.images : resolveVariantImages(combo)
         };
-      } 
+      }
 
       // ✅ FIX: Injecting images directly during compilation mapping
       return {
@@ -462,11 +469,10 @@ export default function VariantBuilderPage({
                   type="button"
                   disabled={isSaving}
                   onClick={() => handleProductTypeChange(type.id as ProductType)}
-                  className={`text-xs font-medium px-3 py-3 rounded-xl border text-center transition-all shadow-xs ${
-                    isSelected
+                  className={`text-xs font-medium px-3 py-3 rounded-xl border text-center transition-all shadow-xs ${isSelected
                       ? "bg-zinc-950 border-zinc-950 text-white shadow-md font-semibold"
                       : "bg-white border-gray-200 text-zinc-700 hover:bg-gray-50 disabled:opacity-50"
-                  }`}
+                    }`}
                 >
                   {type.label}
                 </button>
@@ -506,8 +512,8 @@ export default function VariantBuilderPage({
                   />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={!!attr.hasImage}
                     disabled={isSaving}
                     onChange={() => toggleImageSupport(index)}
@@ -547,7 +553,7 @@ export default function VariantBuilderPage({
                             {hasImage ? (
                               <div className="w-4 h-4 rounded bg-cover bg-center relative border border-black/10" style={{ backgroundImage: `url(${attributeImages[compositeKey]})` }}>
                                 {!isSaving && (
-                                  <div 
+                                  <div
                                     onClick={(e) => removeImage(attr.name, val, e)}
                                     className="absolute -top-1.5 -right-1.5 bg-zinc-950 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 scale-75 hover:bg-red-600 transition-all"
                                   >
@@ -659,17 +665,17 @@ export default function VariantBuilderPage({
 
                   <div className="col-span-4 flex flex-wrap gap-1 w-full">
                     {Object.entries(v.options).map(([key, val]) => {
-  const compositeKey = `${key}:${val}`; //  Fixed to 'val'
-  const hasImg = !!attributeImages[compositeKey];
-  return (
-    <span key={key} className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
-      {hasImg && (
-        <div className="w-3 h-3 rounded bg-cover bg-center border border-black/10" style={{ backgroundImage: `url(${attributeImages[compositeKey]})` }} />
-      )}
-      <span>{key}: {val}</span> //  Fixed to 'val'
-    </span>
-  );
-})}
+                      const compositeKey = `${key}:${val}`; //  Fixed to 'val'
+                      const hasImg = !!attributeImages[compositeKey];
+                      return (
+                        <span key={key} className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
+                          {hasImg && (
+                            <div className="w-3 h-3 rounded bg-cover bg-center border border-black/10" style={{ backgroundImage: `url(${attributeImages[compositeKey]})` }} />
+                          )}
+                          <span>{key}: {val}</span> //  Fixed to 'val'
+                        </span>
+                      );
+                    })}
                   </div>
 
                   <div className="col-span-3 w-full">
@@ -723,11 +729,10 @@ export default function VariantBuilderPage({
         <button
           onClick={handleLocalSave}
           disabled={variants.length === 0 || isSaving}
-          className={`w-full font-medium py-3 rounded-lg text-sm transition-all shadow-sm ${
-            variants.length === 0 || isSaving
+          className={`w-full font-medium py-3 rounded-lg text-sm transition-all shadow-sm ${variants.length === 0 || isSaving
               ? "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
               : "bg-zinc-950 hover:bg-zinc-800 text-white"
-          }`}
+            }`}
         >
           {isSaving ? "Uploading Multi-part Buffers..." : `Save ${variants.length > 0 ? `${variants.length} Variant(s)` : "Variants"}`}
         </button>

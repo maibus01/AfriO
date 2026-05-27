@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { 
-  X, Loader2, Layers, Tag, Package, UploadCloud, FileText, 
-  Scale, BarChart3, Maximize2, Globe, MapPin, Trash2, AlertCircle 
+import {
+  X, Loader2, Layers, Tag, Package, UploadCloud, FileText,
+  Scale, BarChart3, Maximize2, Globe, MapPin, Trash2, AlertCircle
 } from "lucide-react";
 import VariantBuilderPage from "./VariantBuilderPage";
 
@@ -32,7 +32,7 @@ const INITIAL_FORM_STATE = {
   description: "",
   category: "clothes",
   condition: "new" as "new" | "used" | "refurbished",
-  productType: "simple" as ProductType, 
+  productType: "simple" as ProductType,
   basePrice: "",
   currency: "NGN" as "NGN" | "USD" | "CNY" | "GBP",
   stock: "",
@@ -42,13 +42,13 @@ const INITIAL_FORM_STATE = {
     origin: false,
   },
   variants: [] as Array<{
-  id: string;
-  sku: string;
-  options: Record<string, string>;
-  price: number;
-  stock: number;
-  images?: string[]; // ✅ ADD THIS
-}>,
+    id: string;
+    sku: string;
+    options: Record<string, string>;
+    price: number;
+    stock: number;
+    images?: File[] | string[]; // ✅ ADD THIS
+  }>,
   bulkPricing: [] as Array<{ minQty: number; price: number }>,
   measurement: {
     unit: "yard" as "meter" | "yard" | "kg" | "liter",
@@ -66,7 +66,7 @@ interface AddProductFormPageProps {
 
 export default function AddProductFormPage({ editProductData, onCloseOrComplete }: AddProductFormPageProps) {
   const token = localStorage.getItem("token");
-  
+
   const [form, setForm] = useState(INITIAL_FORM_STATE);
   const [businessId, setBusinessId] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -111,10 +111,10 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         productType: derivedType,
         basePrice: editProductData.basePrice?.toString() || "",
         stock: editProductData.stock?.toString() || "",
-        features: { 
+        features: {
           bulkPricing: !!editProductData.features?.bulkPricing,
           weight: !!editProductData.features?.weight,
-          origin: !!editProductData.features?.origin 
+          origin: !!editProductData.features?.origin
         }
       });
 
@@ -148,43 +148,40 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
   };
 
   const compilePayload = () => {
-  const payload: any = {
-    name: form.name,
-    description: form.description,
-    category: form.category,
-    condition: form.condition,
-    currency: form.currency,
-    features: {
-      ...form.features,
-      variants: form.productType === "variant",
-      measurement: form.productType === "measured"
-    },
-    businessId: editProductData ? editProductData.businessId : businessId,
-    existingImages: existingImages
+    const payload: any = {
+      name: form.name,
+      description: form.description,
+      category: form.category,
+      condition: form.condition,
+      currency: form.currency,
+      features: {
+        ...form.features,
+        variants: form.productType === "variant",
+        measurement: form.productType === "measured"
+      },
+      businessId: editProductData ? editProductData.businessId : businessId,
+      existingImages: existingImages
+    };
+
+    // 🔥 FIX HERE
+    if (form.productType === "variant") {
+      payload.basePrice = Number(form.basePrice) || 0;
+
+      payload.variants = form.variants;
+
+      payload.stock = form.variants.reduce(
+        (acc, curr) => acc + (Number(curr.stock) || 0),
+        0
+      );
+    }
+
+    return payload;
   };
-
-  // 🔥 FIX HERE
-  if (form.productType === "variant") {
-    payload.basePrice = Number(form.basePrice) || 0;
-
-    payload.variants = form.variants.map(v => ({
-      ...v,
-      images: v.images || []   // MUST already be URLs
-    }));
-
-    payload.stock = form.variants.reduce(
-      (acc, curr) => acc + (Number(curr.stock) || 0),
-      0
-    );
-  }
-
-  return payload;
-};
 
   const handleImagesUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const filesArray = Array.from(files);
-    
+
     setNewImageFiles((prev) => [...prev, ...filesArray]);
     const visualPreviews = filesArray.map((file) => URL.createObjectURL(file));
     setPreviewUrls((prev) => [...prev, ...visualPreviews]);
@@ -206,7 +203,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
     try {
       setUploading(true);
       setUploadProgress(0);
-      
+
       const payload = compilePayload();
       const formData = new FormData();
 
@@ -222,10 +219,10 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         }
       });
 
-      const config = { 
-        headers: { 
+      const config = {
+        headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data" 
+          "Content-Type": "multipart/form-data"
         },
         onUploadProgress: (progressEvent: any) => {
           if (progressEvent.total) {
@@ -238,12 +235,25 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
       if (editProductData) {
         await axios.patch(`${API}/products/${editProductData._id}`, formData, config);
       } else {
-        await axios.post(`${API}/products`, formData, config);
+        const response = await axios.post(
+          `${API}/products`,
+          formData,
+          config
+        );
+
+        const createdProduct = response.data.data;
+
       }
-      
+
       onCloseOrComplete();
     } catch (err: any) {
       console.error("Submission Error Details:", err);
+
+      console.error("STATUS:", err?.response?.status);
+
+      console.error("DATA:", err?.response?.data);
+
+      console.error("MESSAGE:", err?.message);
       const fallbackMsg = err?.response?.data?.message || "Operational issue executing catalog save schema.";
       setErrorMessage(fallbackMsg);
     } finally {
@@ -254,7 +264,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 flex justify-center items-start relative font-sans">
       <div className="bg-white dark:bg-zinc-900 w-full max-w-2xl rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden">
-        
+
         {/* HEADER */}
         <div className="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900">
           <div>
@@ -269,7 +279,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         </div>
 
         <div className="p-6 space-y-6 max-h-[82vh] overflow-y-auto">
-          
+
           {errorMessage && (
             <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl flex items-start gap-2.5 text-rose-800 dark:text-rose-400 text-xs shadow-sm animate-in fade-in duration-200">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
@@ -314,11 +324,10 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                   key={type}
                   type="button"
                   onClick={() => setForm({ ...form, productType: type })}
-                  className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${
-                    form.productType === type
+                  className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${form.productType === type
                       ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-950 shadow-sm"
                       : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  }`}
+                    }`}
                 >
                   <span className="text-xs font-bold capitalize">{type}</span>
                 </button>
@@ -371,9 +380,9 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
           {/* ADVANCED MODULE FUNCTION BLOCKS */}
           <div className="space-y-3">
             <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Advanced System Functional Blocks</span>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              
+
               {/* OPTIONS ENGINE */}
               {form.productType === "variant" && (
                 <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm sm:col-span-2">

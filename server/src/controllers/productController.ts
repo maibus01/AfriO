@@ -366,7 +366,7 @@ export const createProduct = async (req: any, res: any, next: any) => {
       ownerId: req.user.id,
 
       features: safeParse(req.body.features),
-      variants: safeParse(req.body.variants),
+      // variants: safeParse(req.body.variants),
       measurement: safeParse(req.body.measurement),
       bulkPricing: safeParse(req.body.bulkPricing),
       origin: safeParse(req.body.origin),
