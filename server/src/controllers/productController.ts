@@ -622,12 +622,13 @@ export const getAllProducts = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const addVariant = async (req: any, res: any, next: any) => {
+export const addVariant = async (req: any, res: any, next: NextFunction) => {
   try {
     console.log("🚀 addVariant HIT");
     console.log("📦 BODY:", req.body);
-    console.log("📸 FILES:", req.files);
+    console.log("📸 FILES RECEIVED BY MULTER:", req.files);
 
+    // 1. Find the target parent product
     const product = await Product.findById(req.params.id);
 
     if (!product) {
@@ -637,37 +638,41 @@ export const addVariant = async (req: any, res: any, next: any) => {
 
     console.log("✅ Product found:", product._id);
 
+    // 2. Security Check: Verify Vendor Ownership
     if (product.ownerId.toString() !== req.user.id) {
-      console.log("❌ Unauthorized user");
+      console.log("❌ Unauthorized user trying to modify product");
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // =============================
-    // 📸 HANDLE IMAGE UPLOADS
-    // =============================
+    // ========================================================
+    // 📸 STEP 1: UPLOAD RAW BUFFERS TO CLOUDINARY & GET URLS
+    // ========================================================
     let imageUrls: string[] = [];
 
-    if (req.files && Array.isArray(req.files)) {
-      console.log(`📸 Uploading ${req.files.length} files to Cloudinary...`);
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      console.log(`📸 Uploading ${req.files.length} raw buffers to Cloudinary...`);
 
+      // Fire off all uploads simultaneously for speed
       const uploads = await Promise.all(
         req.files.map(async (file: any, i: number) => {
-          console.log(`➡️ Uploading file ${i + 1}`);
+          console.log(`➡️ Pumping file buffer ${i + 1} to Cloudinary stream...`);
+          
+          // Your utility function handles the cloud stream and returns the result object
           const result = await uploadToCloudinary(file.buffer);
-          return result.secure_url;
+          
+          return result.secure_url; // This is the real "https://res.cloudinary.com/..." web URL
         })
       );
 
       imageUrls = uploads;
     }
 
-    console.log("🖼️ Final image URLs:", imageUrls);
+    console.log("🖼️ Final Production Cloudinary URLs:", imageUrls);
 
-    // =============================
-    // 🧠 PARSE OPTIONS
-    // =============================
+    // ========================================================
+    // 🧠 STEP 2: PARSE OPTIONS METADATA
+    // ========================================================
     let options = {};
-
     try {
       options =
         typeof req.body.options === "string"
@@ -680,9 +685,9 @@ export const addVariant = async (req: any, res: any, next: any) => {
       return res.status(400).json({ success: false, message: "Invalid options format" });
     }
 
-    // =============================
-    // 🔥 SKU GENERATION
-    // =============================
+    // ========================================================
+    // 🔥 STEP 3: SKU GENERATION
+    // ========================================================
     const skuSuffix = Object.values(options || {})
       .join("-")
       .replace(/\s+/g, "")
@@ -692,57 +697,54 @@ export const addVariant = async (req: any, res: any, next: any) => {
       req.body.sku ||
       `${product.name.substring(0, 3).toUpperCase()}-${skuSuffix || Date.now()}`;
 
-    console.log("🏷️ SKU:", sku);
+    console.log("🏷️ Final SKU Assigned:", sku);
 
-    // =============================
-    // 🧩 CREATE VARIANT
-    // =============================
+    // ========================================================
+    // 🧩 STEP 4: ASSEMBLE CLEAN MONGODB VARIANT SCHEMA OBJECT
+    // ========================================================
     const newVariant = {
       id: new mongoose.Types.ObjectId().toString(),
       sku,
       options,
       price: Number(req.body.price || 0),
       stock: Number(req.body.stock || 0),
-      images: imageUrls,
+      images: imageUrls, // 🚀 Saved as clean Cloudinary web links, NOT browser blobs!
     };
 
-    console.log("🧩 New Variant:", newVariant);
+    console.log("🧩 New Variant Document Ready:", newVariant);
 
-    // =============================
-    // 💾 SAVE TO PRODUCT
-    // =============================
+    // ========================================================
+    // 💾 STEP 5: PUSH & SAVE TO MONGODB
+    // ========================================================
     if (!product.variants) {
       product.variants = [];
     }
 
     product.variants.push(newVariant);
-
-    console.log("📊 Variants count BEFORE save:", product.variants.length);
+    console.log("📊 Variants count BEFORE saving document:", product.variants.length);
 
     await product.save();
+    console.log("✅ MongoDB Document Saved Safely");
 
-    console.log("✅ Product saved");
-
-    // =============================
-    // 🔍 VERIFY SAVE
-    // =============================
+    // ========================================================
+    // 🔍 STEP 6: RESPONSE TO FRONTEND WITH UPDATED LIVE DATA
+    // ========================================================
     const updatedProduct = await Product.findById(req.params.id);
 
-    console.log(
-      "📊 Variants count AFTER save:",
-      updatedProduct?.variants?.length
-    );
+    console.log("📊 Variants count AFTER saving document:", updatedProduct?.variants?.length);
 
     return res.status(200).json({
       success: true,
-      message: "Variant added successfully",
+      message: "Variant added successfully with cloud images!",
       data: updatedProduct,
     });
+
   } catch (err) {
-    console.error("🔥 addVariant ERROR:", err);
+    console.error("🔥 addVariant CRITICAL ERROR:", err);
     next(err);
   }
 };
+
 export const updateVariant = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { productId, variantId } = req.params;
