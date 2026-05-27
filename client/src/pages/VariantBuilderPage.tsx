@@ -5,7 +5,7 @@ import { Trash2, Plus, Sliders, Layers, X, Image as ImageIcon, AlertTriangle } f
 
 // --- TYPES & INTERFACES ---
 type Variant = {
-  id: string;
+  _id?: string;
   sku: string;
   options: Record<string, string>;
   price: number;
@@ -397,12 +397,12 @@ export default function VariantBuilderPage({
   };
 
   const removeVariant = (id: string) => {
-    setVariants((prev) => prev.filter((v) => v.id !== id));
+    setVariants((prev) => prev.filter((v) => v._id !== id));
   };
 
   const updateVariant = (id: string, field: keyof Variant, value: any) => {
     setVariants((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
+      prev.map((v) => (v._id === id ? { ...v, [field]: value } : v))
     );
   };
 
@@ -661,7 +661,7 @@ export default function VariantBuilderPage({
 
             <div className="divide-y divide-gray-100 max-h-[350px] overflow-y-auto bg-gray-50 md:bg-white">
               {variants.map((v) => (
-                <div key={v.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors">
+                <div key={v._id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors">
 
                   <div className="col-span-4 flex flex-wrap gap-1 w-full">
                     {Object.entries(v.options).map(([key, val]) => {
@@ -682,7 +682,7 @@ export default function VariantBuilderPage({
                     <input
                       value={v.sku}
                       disabled={isSaving}
-                      onChange={(e) => updateVariant(v.id, "sku", e.target.value)}
+                      onChange={(e) => updateVariant(v._id, "sku", e.target.value)}
                       className="w-full border border-gray-200 px-2 py-1 rounded text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                     />
                   </div>
@@ -692,7 +692,7 @@ export default function VariantBuilderPage({
                       type="number"
                       value={v.price}
                       disabled={isSaving}
-                      onChange={(e) => updateVariant(v.id, "price", Number(e.target.value))}
+                      onChange={(e) => updateVariant(v._id, "price", Number(e.target.value))}
                       className="w-full border border-gray-200 px-2 py-1 rounded text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                     />
                   </div>
@@ -702,14 +702,14 @@ export default function VariantBuilderPage({
                       type="number"
                       value={v.stock}
                       disabled={isSaving}
-                      onChange={(e) => updateVariant(v.id, "stock", Number(e.target.value))}
+                      onChange={(e) => updateVariant(v._id, "stock", Number(e.target.value))}
                       className="w-full border border-gray-200 px-2 py-1 rounded text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                     />
                   </div>
 
                   <div className="col-span-1 flex justify-end w-full md:w-auto">
                     <button
-                      onClick={() => removeVariant(v.id)}
+                      onClick={() => removeVariant(v._id)}
                       disabled={isSaving}
                       className="p-1 text-gray-400 hover:text-red-500 rounded"
                     >

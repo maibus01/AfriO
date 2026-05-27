@@ -42,7 +42,7 @@ const INITIAL_FORM_STATE = {
     origin: false,
   },
   variants: [] as Array<{
-    id: string;
+    _id?: string;
     sku: string;
     options: Record<string, string>;
     price: number;

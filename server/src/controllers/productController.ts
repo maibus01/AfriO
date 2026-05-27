@@ -259,6 +259,7 @@ import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import { Product } from "../models/Product";
 import { Business } from "../models/Business";
+import { Variant } from "../models/Variant";
 import { uploadToCloudinary } from "../utils/cloudinaryUpload";
 
 
@@ -622,125 +623,119 @@ export const getAllProducts = async (req: Request, res: Response, next: NextFunc
   }
 };
 
-export const addVariant = async (req: any, res: any, next: NextFunction) => {
+export const addVariant = async (
+  req: any,
+  res: any,
+  next: NextFunction
+) => {
   try {
-    console.log("🚀 addVariant HIT");
-    console.log("📦 BODY:", req.body);
-    console.log("📸 FILES RECEIVED BY MULTER:", req.files);
-
-    // 1. Find the target parent product
+    // =========================
+    // FIND PRODUCT
+    // =========================
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-      console.log("❌ Product not found");
-      return res.status(404).json({ success: false, message: "Product not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
     }
 
-    console.log("✅ Product found:", product._id);
-
-    // 2. Security Check: Verify Vendor Ownership
+    // =========================
+    // SECURITY
+    // =========================
     if (product.ownerId.toString() !== req.user.id) {
-      console.log("❌ Unauthorized user trying to modify product");
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized",
+      });
     }
 
-    // ========================================================
-    // 📸 STEP 1: UPLOAD RAW BUFFERS TO CLOUDINARY & GET URLS
-    // ========================================================
+    // =========================
+    // CLOUDINARY UPLOAD
+    // =========================
     let imageUrls: string[] = [];
 
-    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-      console.log(`📸 Uploading ${req.files.length} raw buffers to Cloudinary...`);
-
-      // Fire off all uploads simultaneously for speed
+    if (
+      req.files &&
+      Array.isArray(req.files)
+    ) {
       const uploads = await Promise.all(
-        req.files.map(async (file: any, i: number) => {
-          console.log(`➡️ Pumping file buffer ${i + 1} to Cloudinary stream...`);
-          
-          // Your utility function handles the cloud stream and returns the result object
-          const result = await uploadToCloudinary(file.buffer);
-          
-          return result.secure_url; // This is the real "https://res.cloudinary.com/..." web URL
+        req.files.map(async (file: any) => {
+          const result =
+            await uploadToCloudinary(file.buffer);
+
+          return result.secure_url;
         })
       );
 
       imageUrls = uploads;
     }
 
-    console.log("🖼️ Final Production Cloudinary URLs:", imageUrls);
-
-    // ========================================================
-    // 🧠 STEP 2: PARSE OPTIONS METADATA
-    // ========================================================
+    // =========================
+    // OPTIONS
+    // =========================
     let options = {};
+
     try {
       options =
         typeof req.body.options === "string"
           ? JSON.parse(req.body.options)
           : req.body.options;
-
-      console.log("🧠 Parsed options:", options);
-    } catch (err) {
-      console.log("❌ Options parse failed:", err);
-      return res.status(400).json({ success: false, message: "Invalid options format" });
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid options",
+      });
     }
 
-    // ========================================================
-    // 🔥 STEP 3: SKU GENERATION
-    // ========================================================
-    const skuSuffix = Object.values(options || {})
+    // =========================
+    // SKU
+    // =========================
+    const skuSuffix = Object.values(options)
       .join("-")
       .replace(/\s+/g, "")
       .toUpperCase();
 
     const sku =
       req.body.sku ||
-      `${product.name.substring(0, 3).toUpperCase()}-${skuSuffix || Date.now()}`;
+      `${product.name
+        .substring(0, 3)
+        .toUpperCase()}-${skuSuffix}`;
 
-    console.log("🏷️ Final SKU Assigned:", sku);
+    // =========================
+    // SAVE VARIANT
+    // =========================
+    const variant = await Variant.create({
+      productId: product._id,
 
-    // ========================================================
-    // 🧩 STEP 4: ASSEMBLE CLEAN MONGODB VARIANT SCHEMA OBJECT
-    // ========================================================
-    const newVariant = {
-      id: new mongoose.Types.ObjectId().toString(),
       sku,
+
       options,
+
       price: Number(req.body.price || 0),
+
       stock: Number(req.body.stock || 0),
-      images: imageUrls, // 🚀 Saved as clean Cloudinary web links, NOT browser blobs!
-    };
 
-    console.log("🧩 New Variant Document Ready:", newVariant);
+      images: imageUrls,
 
-    // ========================================================
-    // 💾 STEP 5: PUSH & SAVE TO MONGODB
-    // ========================================================
-    if (!product.variants) {
-      product.variants = [];
-    }
+      businessId: product.businessId,
 
-    product.variants.push(newVariant);
-    console.log("📊 Variants count BEFORE saving document:", product.variants.length);
+      ownerId: req.user.id,
+    });
 
-    await product.save();
-    console.log("✅ MongoDB Document Saved Safely");
-
-    // ========================================================
-    // 🔍 STEP 6: RESPONSE TO FRONTEND WITH UPDATED LIVE DATA
-    // ========================================================
-    const updatedProduct = await Product.findById(req.params.id);
-
-    console.log("📊 Variants count AFTER saving document:", updatedProduct?.variants?.length);
-
-    return res.status(200).json({
+    // =========================
+    // RESPONSE
+    // =========================
+    return res.status(201).json({
       success: true,
-      message: "Variant added successfully with cloud images!",
-      data: updatedProduct,
+      message: "Variant saved successfully",
+      data: variant,
     });
 
   } catch (err) {
-    console.error("🔥 addVariant CRITICAL ERROR:", err);
+    console.error(err);
+
     next(err);
   }
 };
