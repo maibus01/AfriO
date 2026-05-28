@@ -5,7 +5,7 @@ import { Trash2, Plus, Sliders, Layers, X, Image as ImageIcon, AlertTriangle } f
 
 // --- TYPES & INTERFACES ---
 type Variant = {
-  _id?: string;
+  id: string; // Synchronized state identifier
   sku: string;
   options: Record<string, string>;
   price: number;
@@ -22,7 +22,7 @@ interface Attribute {
 }
 
 interface Props {
-  productId: string;
+  businessId: string;
   baseName: string;
   basePrice: number;
   onClose: () => void;
@@ -30,63 +30,66 @@ interface Props {
   onSuccess?: () => void;
 }
 
-const API = "https://afrio-api.onrender.com/api";
+const API = typeof window !== "undefined" && window.location.hostname === "localhost"
+  ? "http://localhost:5000/api"
+  : "https://afrio-api.onrender.com/api";
 
 type ProductType = "clothing" | "phone" | "electronics" | "custom";
 
 const VARIANT_LIMIT = 200;
 
 // --- 🔥 INTEGRATED API SAVE BRIDGE (FormData Multi-part Layer) ---
-// --- 🔥 INTEGRATED API SAVE BRIDGE (FormData Multi-part Layer) ---
-export const saveVariantsToDB = async (
-  productId: string,
-  variants: Variant[],
-  attributeFiles: AttributeFiles
-) => {
-  try {
-    await Promise.all(
-      variants.map(async (variant) => {
-        const formData = new FormData();
+// export const saveVariantsToDB = async (
+//    businessId: string,
+//   variants: Variant[],
+//   attributeFiles: AttributeFiles
+// ) => {
+//   try {
+//     await Promise.all(
+//       variants.map(async (variant) => {
+//         const formData = new FormData();
 
-        // 📦 Variant schema mapping
-        formData.append("sku", variant.sku);
-        formData.append("price", String(variant.price));
-        formData.append("stock", String(variant.stock));
-        formData.append("options", JSON.stringify(variant.options));
+//         // 📦 Variant schema mapping
+//         formData.append("businessId", businessId);
+//         formData.append("sku", variant.sku);
+//         formData.append("price", String(variant.price));
+//         formData.append("stock", String(variant.stock));
+//         formData.append("options", JSON.stringify(variant.options));
 
-        // 📸 Upload matching attribute images
-        Object.entries(variant.options).forEach(([key, value]) => {
-          const fileKey = `${key}:${value}`;
-          const file = attributeFiles[fileKey];
+//         // 📸 Upload matching attribute images
+//         Object.entries(variant.options).forEach(([key, value]) => {
+//           const fileKey = `${key}:${value}`;
+//           const file = attributeFiles[fileKey];
 
-          if (file) {
-            formData.append("images", file);
-          }
-        });
+//           if (file) {
+//             formData.append("images", file);
+//           }
+//         });
 
-        // 🚀 Save variant
-        await axios.post(
-          `${API}/products/${productId}/variants`,
-          formData,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-      })
-    );
+//         // 🚀 Save variant
+//         await axios.post(
+//           `${API}/variants`,
+//           formData,
+//           {
+//             headers: {
+//               Authorization: `Bearer ${localStorage.getItem("token")}`,
+//               "Content-Type": "multipart/form-data",
+//             },
+//           }
+//         );
+//       })
+//     );
 
-    return { success: true };
-  } catch (err) {
-    console.error("Variant save failed:", err);
-    throw err;
-  }
-};
+//     return { success: true };
+//   } catch (err) {
+//     console.error("Variant save failed:", err);
+//     throw err;
+//   }
+// };
+
 // --- MAIN COMPONENT ENGINE ---
 export default function VariantBuilderPage({
-  productId,
+  businessId,
   baseName,
   basePrice,
   onSave,
@@ -301,20 +304,20 @@ export default function VariantBuilderPage({
   };
 
   // ✅ IMAGE COMPILATION HELPER
- const resolveVariantImages = (combo: Record<string, string>) => {
-  const images: File[] = [];
+  const resolveVariantImages = (combo: Record<string, string>) => {
+    const images: File[] = [];
 
-  Object.entries(combo).forEach(([key, value]) => {
-    const compositeKey = `${key}:${value}`;
-    const file = attributeFiles[compositeKey];
+    Object.entries(combo).forEach(([key, value]) => {
+      const compositeKey = `${key}:${value}`;
+      const file = attributeFiles[compositeKey];
 
-    if (file) {
-      images.push(file);
-    }
-  });
+      if (file) {
+        images.push(file);
+      }
+    });
 
-  return images;
-};
+    return images;
+  };
 
   // ⚡ RECURSIVE CARTESIAN ENGINE
   const handleGenerationClick = () => {
@@ -367,7 +370,6 @@ export default function VariantBuilderPage({
         Object.entries(combo).every(([k, val]) => v.options[k] === val)
       );
 
-      // If variant existed previously, make sure we append images if they were missing
       if (existingMatch) {
         return {
           ...existingMatch,
@@ -375,7 +377,6 @@ export default function VariantBuilderPage({
         };
       }
 
-      // ✅ FIX: Injecting images directly during compilation mapping
       return {
         id: `var-${Date.now()}-${i}`,
         sku: generatedSku,
@@ -397,32 +398,65 @@ export default function VariantBuilderPage({
   };
 
   const removeVariant = (id: string) => {
-    setVariants((prev) => prev.filter((v) => v._id !== id));
+    setVariants((prev) => prev.filter((v) => v.id !== id));
   };
 
   const updateVariant = (id: string, field: keyof Variant, value: any) => {
     setVariants((prev) =>
-      prev.map((v) => (v._id === id ? { ...v, [field]: value } : v))
+      prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
     );
   };
 
-  // 💾 FIRES INTERNAL FROM COMPONENT - DELEGATES UPWARD VIA PROPS WITH SNAPSHOT FIX
-  const handleLocalSave = async () => {
-    if (variants.length === 0) return;
-    setIsSaving(true);
-    setErrorMessage(null);
-    try {
-      const filesSnapshot = { ...attributeFiles };
+  // 💾 SUBMIT WITH ASSETS DIRECT TO DATABASE
+  // const handleLocalSave = async () => {
+  //   if (variants.length === 0) return;
+  //   setIsSaving(true);
+  //   setErrorMessage(null);
+  //   try {
+  //     const filesSnapshot = { ...attributeFiles };
 
-      // Pass state payloads back to Parent Context cleanly
-      await onSave(variants, filesSnapshot);
-      if (onSuccess) onSuccess();
-    } catch (err: any) {
-      setErrorMessage(err?.message || "Failed saving compilation sequence to DB via parent submission.");
-    } finally {
-      setIsSaving(false);
+  //     // 1. Direct-Save API Execution Stream
+  //     await saveVariantsToDB(businessId, variants, filesSnapshot);
+      
+  //     // 2. Bubble up back to parent hooks seamlessly
+  //     await onSave(variants, filesSnapshot);
+  //     if (onSuccess) onSuccess();
+  //   } catch (err: any) {
+  //     setErrorMessage(err?.response?.data?.message || err?.message || "Failed saving compilation sequence to DB.");
+  //   } finally {
+  //     setIsSaving(false);
+  //   }
+  // };
+
+  const handleLocalSave = async () => {
+  if (variants.length === 0) return;
+
+  setIsSaving(true);
+  setErrorMessage(null);
+
+  try {
+    const filesSnapshot = { ...attributeFiles };
+
+    // ONLY send state to parent
+    await onSave(
+      variants,
+      filesSnapshot
+    );
+
+    if (onSuccess) {
+      onSuccess();
     }
-  };
+
+  } catch (err: any) {
+    setErrorMessage(
+      err?.response?.data?.message ||
+      err?.message ||
+      "Failed preparing variants."
+    );
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   return (
     <div className="max-w-4xl mx-4 sm:mx-6 md:mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 my-6 flex flex-col overflow-hidden">
@@ -661,18 +695,18 @@ export default function VariantBuilderPage({
 
             <div className="divide-y divide-gray-100 max-h-[350px] overflow-y-auto bg-gray-50 md:bg-white">
               {variants.map((v) => (
-                <div key={v._id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors">
+                <div key={v.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 p-4 md:px-4 md:py-3 items-start md:items-center bg-white hover:bg-gray-50/70 transition-colors">
 
                   <div className="col-span-4 flex flex-wrap gap-1 w-full">
                     {Object.entries(v.options).map(([key, val]) => {
-                      const compositeKey = `${key}:${val}`; //  Fixed to 'val'
+                      const compositeKey = `${key}:${val}`;
                       const hasImg = !!attributeImages[compositeKey];
                       return (
                         <span key={key} className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200/50">
                           {hasImg && (
                             <div className="w-3 h-3 rounded bg-cover bg-center border border-black/10" style={{ backgroundImage: `url(${attributeImages[compositeKey]})` }} />
                           )}
-                          <span>{key}: {val}</span> //  Fixed to 'val'
+                          <span>{key}: {val}</span>
                         </span>
                       );
                     })}
@@ -682,7 +716,7 @@ export default function VariantBuilderPage({
                     <input
                       value={v.sku}
                       disabled={isSaving}
-                      onChange={(e) => updateVariant(v._id, "sku", e.target.value)}
+                      onChange={(e) => updateVariant(v.id, "sku", e.target.value)}
                       className="w-full border border-gray-200 px-2 py-1 rounded text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                     />
                   </div>
@@ -692,7 +726,7 @@ export default function VariantBuilderPage({
                       type="number"
                       value={v.price}
                       disabled={isSaving}
-                      onChange={(e) => updateVariant(v._id, "price", Number(e.target.value))}
+                      onChange={(e) => updateVariant(v.id, "price", Number(e.target.value))}
                       className="w-full border border-gray-200 px-2 py-1 rounded text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                     />
                   </div>
@@ -702,14 +736,14 @@ export default function VariantBuilderPage({
                       type="number"
                       value={v.stock}
                       disabled={isSaving}
-                      onChange={(e) => updateVariant(v._id, "stock", Number(e.target.value))}
+                      onChange={(e) => updateVariant(v.id, "stock", Number(e.target.value))}
                       className="w-full border border-gray-200 px-2 py-1 rounded text-xs focus:outline-none focus:ring-1 focus:ring-zinc-900"
                     />
                   </div>
 
                   <div className="col-span-1 flex justify-end w-full md:w-auto">
                     <button
-                      onClick={() => removeVariant(v._id)}
+                      onClick={() => removeVariant(v.id)}
                       disabled={isSaving}
                       className="p-1 text-gray-400 hover:text-red-500 rounded"
                     >
@@ -741,4 +775,3 @@ export default function VariantBuilderPage({
     </div>
   );
 }
-

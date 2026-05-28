@@ -17,6 +17,7 @@ import StyleDetails from "./pages/StyleDetails";
 import PublicSeller from "./pages/PublicSeller";
 import ChatPage from "./pages/ChatPage";
 import OrderPage from "./pages/Order";
+import StartOrder from "./pages/VariantSelector";
 import AdminAccounts from "./pages/AdminAccouts";
 import AdminOrders from "./pages/AdminOrders";
 import AdminRequests from "./pages/AdminStyleRequest";
@@ -33,7 +34,7 @@ function App() {
 
       <CartProvider>
         <Router>
-          <ButtonBar />
+          {/* <ButtonBar /> */}
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/auth" element={<AuthPage />} />

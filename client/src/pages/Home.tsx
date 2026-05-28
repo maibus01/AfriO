@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useCart } from "../context/CartContext";
-import { Search, ShoppingBag, Layers, ShoppingCart, Flame, Sparkles } from "lucide-react";
+import { Search, Layers, ShoppingCart, Flame, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ButtonBar from "../components/ButtonBar";
 
@@ -32,7 +32,8 @@ const APP_CATEGORIES = [
 interface Product {
   _id: string;
   name: string;
-  price: number;
+  price?: number;     // Keeping as optional fallback
+  basePrice?: number; // Added new property
   images?: string[];
   category?: string;
   businessId?: {
@@ -114,7 +115,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* --- HORIZONTAL NOON/TEMU STYLE DISK ROW --- */}
+      {/* --- HORIZONTAL CATEGORY ROW --- */}
       <div className="w-full bg-white dark:bg-neutral-950 border-b border-neutral-200/40 dark:border-neutral-900/40 py-2.5 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="flex items-center gap-3.5 px-3 max-w-7xl mx-auto w-max">
           
@@ -160,7 +161,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* --- TEMU DENSE PRODUCT FEED GRID --- */}
+      {/* --- PRODUCT FEED GRID --- */}
       <main className="relative flex-grow max-w-7xl w-full mx-auto px-2 pt-2.5 pb-24 z-10 overflow-y-auto scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <section>
           {loading ? (
@@ -177,65 +178,70 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
-              {filteredProducts.map(p => (
-                <div 
-                  key={p._id} 
-                  onClick={() => navigate(`/product/${p._id}`)} 
-                  className="group relative cursor-pointer flex flex-col h-full bg-white dark:bg-neutral-900 rounded-lg overflow-hidden border border-neutral-200/40 dark:border-neutral-800/40 shadow-sm active:opacity-90 transition-opacity"
-                >
-                  {/* Image Block */}
-                  <div className="aspect-square w-full bg-neutral-100 dark:bg-neutral-950 overflow-hidden relative">
-                    <img 
-                      src={p.images?.[0] || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200&auto=format&fit=crop"} 
-                      className="w-full h-full object-cover" 
-                      alt={p.name}
-                      loading="lazy"
-                    />
+              {filteredProducts.map(p => {
+                // Safeguard lookup sequence: tries basePrice first, then falls back to price, defaults to 0
+                const displayedPrice = p.basePrice ?? p.price ?? 0;
+
+                return (
+                  <div 
+                    key={p._id} 
+                    onClick={() => navigate(`/product/${p._id}`)} 
+                    className="group relative cursor-pointer flex flex-col h-full bg-white dark:bg-neutral-900 rounded-lg overflow-hidden border border-neutral-200/40 dark:border-neutral-800/40 shadow-sm active:opacity-90 transition-opacity"
+                  >
+                    {/* Image Block */}
+                    <div className="aspect-square w-full bg-neutral-100 dark:bg-neutral-950 overflow-hidden relative">
+                      <img 
+                        src={p.images?.[0] || "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200&auto=format&fit=crop"} 
+                        className="w-full h-full object-cover" 
+                        alt={p.name}
+                        loading="lazy"
+                      />
+                      
+                      {/* Promo Tag */}
+                      <div className="absolute top-1 left-1 bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                        Top Sale
+                      </div>
+                    </div>
                     
-                    {/* Temu-style Asymmetric Promo Tag */}
-                    <div className="absolute top-1 left-1 bg-amber-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
-                      Top Sale
-                    </div>
-                  </div>
-                  
-                  {/* Item Details */}
-                  <div className="p-2 flex flex-col flex-grow">
-                    <h2 className="text-neutral-800 dark:text-neutral-200 font-medium line-clamp-2 text-xs leading-tight mb-1">
-                      {p.name}
-                    </h2>
+                    {/* Item Details */}
+                    <div className="p-2 flex flex-col flex-grow">
+                      <h2 className="text-neutral-800 dark:text-neutral-200 font-medium line-clamp-2 text-xs leading-tight mb-1">
+                        {p.name}
+                      </h2>
 
-                    {/* Temu Style Social Urgency Proof Line */}
-                    <div className="flex items-center gap-1 mb-1.5">
-                      <span className="text-[9px] bg-red-500/10 text-red-500 font-bold px-1 rounded">
-                        Deal
-                      </span>
-                      <span className="text-[9px] text-neutral-400 dark:text-neutral-500 font-medium">
-                        99+ sold recently
-                      </span>
-                    </div>
-
-                    {/* Price & Action Footer Container */}
-                    <div className="mt-auto pt-1 flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-amber-600 dark:text-amber-500 font-extrabold text-sm leading-none">
-                          ₦{p.price ? p.price.toLocaleString() : "0"}
+                      {/* Social Urgency Proof Line */}
+                      <div className="flex items-center gap-1 mb-1.5">
+                        <span className="text-[9px] bg-red-500/10 text-red-500 font-bold px-1 rounded">
+                          Deal
+                        </span>
+                        <span className="text-[9px] text-neutral-400 dark:text-neutral-500 font-medium">
+                          99+ sold recently
                         </span>
                       </div>
 
-                      {/* Cart Button */}
-                      {/* <button 
-                        onClick={(e) => {
-                          e.stopPropagation(); // Stops routing to detail screen
-                          addToCart(p);        // Pushes to global frontend state
-                        }}
-                        className="p-1.5 rounded-full bg-amber-500 hover:bg-amber-600 text-black transition-all active:scale-90 shadow-sm"
-                      >
-                        <ShoppingCart size={13} className="stroke-[2.5]" />
-                      </button> */}
+                      {/* Price & Action Footer Container */}
+                      <div className="mt-auto pt-1 flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-amber-600 dark:text-amber-500 font-extrabold text-sm leading-none">
+                            ₦{displayedPrice.toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Cart Button (Optional setup un-comment if needed) */}
+                        {/* <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(p);
+                          }}
+                          className="p-1.5 rounded-full bg-amber-500 hover:bg-amber-600 text-black transition-all active:scale-90 shadow-sm"
+                        >
+                          <ShoppingCart size={13} className="stroke-[2.5]" />
+                        </button> */}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

@@ -14,6 +14,7 @@ import {
   Compass
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ButtonBar from "../components/ButtonBar";
 
 const API = "https://afrio-api.onrender.com/api";
 
@@ -435,7 +436,7 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
-
+           <ButtonBar />
       </div>
     </div>
   );

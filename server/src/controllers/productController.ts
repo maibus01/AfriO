@@ -1,260 +1,3 @@
-// import { Request, Response, NextFunction } from "express";
-// import { Product } from "../models/Product";
-// import { Business } from "../models/Business";
-
-// // =========================
-// // CREATE PRODUCT (VENDOR ONLY)
-// // =========================
-// export const createProduct = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const { name, description, price, images, category, stock, businessId } =
-//       req.body;
-
-//     // 🔐 check business belongs to user
-//     const business = await Business.findById(businessId);
-
-//     if (!business) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Business not found",
-//       });
-//     }
-
-//     if (business.ownerId.toString() !== req.user.id) {
-//       return res.status(403).json({
-//         success: false,
-//         message: "Not your business",
-//       });
-//     }
-
-//     if (business.category !== "vendor") {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Only vendor businesses can add products",
-//       });
-//     }
-
-//     const product = await Product.create({
-//       name,
-//       description,
-//       price,
-//       images,
-//       category,
-//       stock,
-//       businessId,
-//       ownerId: req.user.id,
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       data: product,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
-// export const getAllProductsAdmin = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const products = await Product.find()
-//       .populate("businessId")
-//       .populate("ownerId");
-
-//     res.json({
-//       success: true,
-//       products,
-//     });
-//   } catch (err) {
-//     res.status(500).json({ message: "Failed to fetch products" });
-//   }
-// };
-
-// // =========================
-// // GET MY VENDOR PRODUCTS
-// // =========================
-// export const getMyProducts = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const products = await Product.find({
-//       ownerId: req.user.id,
-//     }).populate("businessId");
-
-//     res.status(200).json({
-//       success: true,
-//       results: products.length,
-//       data: products,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
-// // =========================
-// // PUBLIC: GET PRODUCT BY ID
-// // =========================
-// export const getProductById = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const product = await Product.findById(req.params.id).populate("businessId");
-
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Product not found",
-//       });
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       data: product,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
-// export const getProductsByBusiness = async (req: Request, res: Response) => {
-//   try {
-//     const products = await Product.find({
-//       businessId: req.params.businessId,
-//       isActive: true,
-//     }).populate("businessId");
-
-//     res.json({
-//       success: true,
-//       data: products,
-//     });
-//   } catch (err) {
-//     res.status(500).json({ message: "Error fetching products" });
-//   }
-// };
-
-// // =========================
-// // UPDATE PRODUCT
-// // =========================
-// export const updateProduct = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const product = await Product.findById(req.params.id);
-
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Product not found",
-//       });
-//     }
-
-//     if (product.ownerId.toString() !== req.user.id) {
-//       return res.status(403).json({
-//         success: false,
-//         message: "Not authorized",
-//       });
-//     }
-
-//     const allowed = ["name", "description", "price", "images", "stock", "category"];
-
-//     allowed.forEach((field) => {
-//       if (req.body[field] !== undefined) {
-//         (product as any)[field] = req.body[field];
-//       }
-//     });
-
-//     await product.save();
-
-//     res.status(200).json({
-//       success: true,
-//       data: product,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
-// // =========================
-// // DELETE PRODUCT (SOFT DELETE)
-// // =========================
-// export const deleteProduct = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const product = await Product.findById(req.params.id);
-
-//     if (!product) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Product not found",
-//       });
-//     }
-
-//     if (product.ownerId.toString() !== req.user.id) {
-//       return res.status(403).json({
-//         success: false,
-//         message: "Not authorized",
-//       });
-//     }
-
-//     product.isActive = false;
-//     await product.save();
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Product removed",
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
-// // =========================
-// // PUBLIC: GET ALL PRODUCTS
-// // =========================
-// export const getAllProducts = async (
-//   req: Request,
-//   res: Response,
-//   next: NextFunction
-// ) => {
-//   try {
-//     const { category } = req.query;
-
-//     const filter: any = {};
-
-//     if (category) {
-//       filter.category = category;
-//     }
-
-//     const products = await Product.find(filter)
-//       .populate("businessId")
-//       .sort({ createdAt: -1 });
-
-//     res.status(200).json({
-//       success: true,
-//       results: products.length,
-//       data: products,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
 import { Request, Response, NextFunction } from "express";
 import mongoose from "mongoose";
 import { Product } from "../models/Product";
@@ -298,18 +41,26 @@ const parseIfJson = (value: any) => {
   }
 };
 
-export const createProduct = async (req: any, res: any, next: any) => {
+export const createProduct = async (
+  req: any,
+  res: any,
+  next: any
+) => {
   try {
     const {
       name,
       description,
-      price,
+      basePrice,
       category,
       stock,
+      currency,
+      condition,
       businessId,
     } = req.body;
 
-    // 🔐 MUST exist
+    // =========================
+    // AUTH CHECK
+    // =========================
     if (!req.user?.id) {
       return res.status(401).json({
         success: false,
@@ -317,7 +68,13 @@ export const createProduct = async (req: any, res: any, next: any) => {
       });
     }
 
-    const business = await Business.findById(businessId);
+    // =========================
+    // BUSINESS CHECK
+    // =========================
+    const business =
+      await Business.findById(
+        businessId
+      );
 
     if (!business) {
       return res.status(404).json({
@@ -326,28 +83,53 @@ export const createProduct = async (req: any, res: any, next: any) => {
       });
     }
 
-    if (business.ownerId.toString() !== req.user.id) {
+    if (
+      business.ownerId.toString() !==
+      req.user.id
+    ) {
       return res.status(403).json({
         success: false,
         message: "Not your business",
       });
     }
 
-    // 📸 images (safe fallback)
+    // =========================
+    // IMAGE UPLOAD
+    // =========================
     let imageUrls: string[] = [];
 
-    if (req.files && Array.isArray(req.files)) {
-      const uploads = await Promise.all(
-        req.files.map((f: any) => uploadToCloudinary(f.buffer))
-      );
+    if (
+      req.files &&
+      Array.isArray(req.files)
+    ) {
+      const uploads =
+        await Promise.all(
+          req.files.map((f: any) =>
+            uploadToCloudinary(
+              f.buffer
+            )
+          )
+        );
 
-      imageUrls = uploads.map((r) => r.secure_url);
+      imageUrls = uploads.map(
+        (r) => r.secure_url
+      );
     }
 
-    // 🧠 SAFE JSON parsing ONLY if exists
-    const safeParse = (v: any) => {
+    // =========================
+    // SAFE JSON PARSER
+    // =========================
+    const safeParse = (
+      v: any
+    ) => {
       if (!v) return undefined;
-      if (typeof v !== "string") return v;
+
+      if (
+        typeof v !== "string"
+      ) {
+        return v;
+      }
+
       try {
         return JSON.parse(v);
       } catch {
@@ -355,31 +137,128 @@ export const createProduct = async (req: any, res: any, next: any) => {
       }
     };
 
-    const product = await Product.create({
-      name,
-      description,
-      basePrice: price ? Number(price) : undefined,
-      category,
-      stock: stock ? Number(stock) : 0,
+    // =========================
+    // PARSED DATA
+    // =========================
+    const parsedFeatures =
+      safeParse(
+        req.body.features
+      );
 
-      images: imageUrls,
-      businessId,
-      ownerId: req.user.id,
+    const parsedVariants =
+      safeParse(
+        req.body.variants
+      );
 
-      features: safeParse(req.body.features),
-      // variants: safeParse(req.body.variants),
-      measurement: safeParse(req.body.measurement),
-      bulkPricing: safeParse(req.body.bulkPricing),
-      origin: safeParse(req.body.origin),
-    });
+    const parsedMeasurement =
+      safeParse(
+        req.body.measurement
+      );
+
+    const parsedBulkPricing =
+      safeParse(
+        req.body.bulkPricing
+      );
+
+    const parsedOrigin =
+      safeParse(
+        req.body.origin
+      );
+
+    // =========================
+    // CREATE PRODUCT
+    // =========================
+    const product =
+      await Product.create({
+        name,
+
+        description,
+
+        images: imageUrls,
+
+        category,
+
+        condition:
+          condition || "new",
+
+        basePrice: basePrice
+          ? Number(basePrice)
+          : 0,
+
+        currency:
+          currency || "NGN",
+
+        stock: stock
+          ? Number(stock)
+          : 0,
+
+        sold: 0,
+
+        features:
+          parsedFeatures || {},
+
+        // ✅ STORE VARIANT IDS
+        variants:
+          parsedVariants || [],
+
+        measurement:
+          parsedMeasurement,
+
+        bulkPricing:
+          parsedBulkPricing ||
+          [],
+
+        origin: parsedOrigin,
+
+        businessId,
+
+        ownerId: req.user.id,
+
+        isActive: true,
+      });
 
     return res.status(201).json({
       success: true,
       data: product,
     });
   } catch (err) {
-    console.error("CREATE PRODUCT ERROR:", err);
+    console.error(
+      "CREATE PRODUCT ERROR:",
+      err
+    );
+
     next(err);
+  }
+};
+
+export const uploadSingleImage = async (
+  req: any,
+  res: Response
+) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No image uploaded",
+      });
+    }
+
+    const file = req.files[0];
+
+    const uploaded = await uploadToCloudinary(file.buffer);
+
+    return res.status(200).json({
+      success: true,
+      url: uploaded.secure_url,
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Upload failed",
+    });
   }
 };
 
@@ -411,7 +290,8 @@ export const getMyProducts = async (req: Request, res: Response, next: NextFunct
     const products = await Product.find({
       ownerId: req.user.id,
       isActive: true,
-    }).populate("businessId");
+    }).populate("businessId")
+    .populate("variants");
 
     res.status(200).json({
       success: true,
@@ -427,11 +307,50 @@ export const getMyProducts = async (req: Request, res: Response, next: NextFunct
 // =========================
 // GET PRODUCT BY ID
 // =========================
-export const getProductById = async (req: Request, res: Response, next: NextFunction) => {
+// export const getProductById = async (
+//   req: Request,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const product = await Product.findById(req.params.id)
+//       .populate("businessId")
+//       .populate("ownerId")
+//       .populate({
+//         path: "variants",
+//         model: "Variant",
+//       });
+
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       data: product,
+//     });
+
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+export const getProductById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<any> => {
   try {
     const product = await Product.findById(req.params.id)
       .populate("businessId")
-      .populate("ownerId");
+      .populate("ownerId")
+      .populate({
+        path: "variants",
+        model: "Variant",
+      });
 
     if (!product) {
       return res.status(404).json({
@@ -440,15 +359,31 @@ export const getProductById = async (req: Request, res: Response, next: NextFunc
       });
     }
 
+    // ========================================================
+    // GYARA: Tabbatar da tsarin Variants dangane da Features
+    // ========================================================
+    // Canza product din zuwa plain JavaScript object don mu iya taba shi lafiya
+    const productObject = product.toObject();
+
+    // Idan samfurin ba na mai variants ba ne, ko kuma babu variants din kwata-kwata
+    if (!productObject.features?.variants || !productObject.variants) {
+      productObject.variants = []; // Sanya shi empty array don tsaro a UI
+    } else {
+      // Idan yana da variants, muna iya tace wadanda suke da "isActive: true" kawai
+      productObject.variants = productObject.variants.filter(
+        (v: any) => v && v.isActive === true
+      );
+    }
+
     return res.status(200).json({
       success: true,
-      data: product,
+      data: productObject, // Maido da ingantaccen samfurin
     });
+
   } catch (err) {
     next(err);
   }
 };
-
 
 // =========================
 // GET PRODUCTS BY BUSINESS
@@ -458,7 +393,8 @@ export const getProductsByBusiness = async (req: Request, res: Response, next: N
     const products = await Product.find({
       businessId: req.params.businessId,
       isActive: true,
-    }).populate("businessId");
+    }).populate("businessId")
+    .populate("variants");
 
     res.json({
       success: true,
@@ -630,21 +566,36 @@ export const addVariant = async (
 ) => {
   try {
     // =========================
-    // FIND PRODUCT
+    // AUTH
     // =========================
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({
+    if (!req.user?.id) {
+      return res.status(401).json({
         success: false,
-        message: "Product not found",
+        message: "Unauthorized",
       });
     }
 
     // =========================
-    // SECURITY
+    // BUSINESS VALIDATION
     // =========================
-    if (product.ownerId.toString() !== req.user.id) {
+    const business = await Business.findById(
+      req.body.businessId
+    );
+
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: "Business not found",
+      });
+    }
+
+    // =========================
+    // SECURITY CHECK
+    // =========================
+    if (
+      business.ownerId.toString() !==
+      req.user.id
+    ) {
       return res.status(403).json({
         success: false,
         message: "Unauthorized",
@@ -663,7 +614,9 @@ export const addVariant = async (
       const uploads = await Promise.all(
         req.files.map(async (file: any) => {
           const result =
-            await uploadToCloudinary(file.buffer);
+            await uploadToCloudinary(
+              file.buffer
+            );
 
           return result.secure_url;
         })
@@ -673,133 +626,243 @@ export const addVariant = async (
     }
 
     // =========================
+    // SAFE JSON PARSER
+    // =========================
+    const safeParse = (value: any) => {
+      if (!value) return undefined;
+
+      if (typeof value !== "string") {
+        return value;
+      }
+
+      try {
+        return JSON.parse(value);
+      } catch {
+        return undefined;
+      }
+    };
+
+    // =========================
     // OPTIONS
     // =========================
-    let options = {};
-
-    try {
-      options =
-        typeof req.body.options === "string"
-          ? JSON.parse(req.body.options)
-          : req.body.options;
-    } catch {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid options",
-      });
-    }
+    const options =
+      safeParse(req.body.options) || {};
 
     // =========================
     // SKU
     // =========================
-    const skuSuffix = Object.values(options)
-      .join("-")
-      .replace(/\s+/g, "")
-      .toUpperCase();
-
     const sku =
       req.body.sku ||
-      `${product.name
-        .substring(0, 3)
-        .toUpperCase()}-${skuSuffix}`;
+      `VAR-${Date.now()}`;
 
     // =========================
-    // SAVE VARIANT
+    // CREATE VARIANT
     // =========================
-    const variant = await Variant.create({
-      productId: product._id,
+  const variant = await Variant.create({
+  sku,
+  options,
+  price: Number(req.body.price || 0),
+  stock: Number(req.body.stock || 0),
+  images: imageUrls,
+  businessId: business._id,
+  isActive: true,
+});
 
-      sku,
-
-      options,
-
-      price: Number(req.body.price || 0),
-
-      stock: Number(req.body.stock || 0),
-
-      images: imageUrls,
-
-      businessId: product.businessId,
-
-      ownerId: req.user.id,
-    });
+// attach variant to product
+if (req.body.productId) {
+  await Product.findByIdAndUpdate(
+    req.body.productId,
+    {
+      $push: {
+        variants: variant._id,
+      },
+    }
+  );
+}
 
     // =========================
     // RESPONSE
     // =========================
     return res.status(201).json({
       success: true,
-      message: "Variant saved successfully",
+      message:
+        "Variant created successfully",
       data: variant,
     });
 
   } catch (err) {
-    console.error(err);
+    console.error(
+      "ADD VARIANT ERROR:",
+      err
+    );
 
     next(err);
   }
 };
 
-export const updateVariant = async (req: Request, res: Response, next: NextFunction) => {
+export const getVariantById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<any> => {
   try {
     const { productId, variantId } = req.params;
 
+    // 1. Nemo Product ɗin da farko
     const product = await Product.findById(productId);
-
     if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Parent Product not found",
+      });
     }
 
-    if (product.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+    // 2. 🔴 DUBAWA NA TSARO: Shin wannan product ɗin ma yana da fasalin variants kuwa?
+    // Idan "features.variants" kuskure ne (false) ko kuma babu "product.variants" array...
+    if (!product.features?.variants || !product.variants) {
+      return res.status(400).json({
+        success: false,
+        message: "This product does not support or contain any variants.",
+      });
     }
 
-    const variant = product.variants?.find(v => v.id === variantId);
+    // 3. Tunda tsarin ya tabbatar samfurin yana da variants, yanzu muna iya kiran .some() lafiya lau
+    const belongsToProduct = product.variants.some(
+      (id: any) => id.toString() === variantId
+    );
 
-    if (!variant) {
-      return res.status(404).json({ success: false, message: "Variant not found" });
+    if (!belongsToProduct) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: This variant does not belong to the specified product.",
+      });
     }
 
-    Object.assign(variant, req.body);
+    // 4. Nemo variant ɗin tunda dukkan sharunansu sun cika
+    const variant = await Variant.findById(variantId);
+    if (!variant || !variant.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: "Variant not found or inactive",
+      });
+    }
 
-    await product.save();
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Variant updated",
-      data: product,
+      data: variant,
     });
+
   } catch (err) {
+    console.error("GET VARIANT BY ID ERROR:", err);
     next(err);
   }
 };
 
-export const deleteVariant = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { productId, variantId } = req.params;
+/**
+ * Secures and fetches a specific variant only if it belongs to the specified product.
+ * (The variant doesn't know its product, but the product validates the variant's ID).
+ */
+// export const updateVariant = async (
+//   req: any,
+//   res: Response,
+//   next: NextFunction
+// ) => {
+//   try {
+//     const { variantId } =
+//       req.params;
 
-    const product = await Product.findById(productId);
+//     const variant =
+//       await Variant.findById(
+//         variantId
+//       );
 
-    if (!product) {
-      return res.status(404).json({ success: false, message: "Product not found" });
-    }
+//     if (!variant) {
+//       return res.status(404).json({
+//         success: false,
+//         message:
+//           "Variant not found",
+//       });
+//     }
 
-    if (product.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
-    }
+//     // =========================
+//     // FIND PRODUCT
+//     // =========================
+//     const product =
+//       await Product.findById(
+//         variant.productId
+//       );
 
-    product.variants = product.variants?.filter(v => v.id !== variantId);
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message:
+//           "Product not found",
+//       });
+//     }
 
-    await product.save();
+//     // =========================
+//     // SECURITY
+//     // =========================
+//     if (
+//       product.ownerId.toString() !==
+//       req.user.id
+//     ) {
+//       return res.status(403).json({
+//         success: false,
+//         message:
+//           "Not authorized",
+//       });
+//     }
 
-    res.status(200).json({
-      success: true,
-      message: "Variant deleted",
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+//     // =========================
+//     // UPDATE
+//     // =========================
+//     Object.assign(
+//       variant,
+//       req.body
+//     );
+
+//     await variant.save();
+
+//     return res.status(200).json({
+//       success: true,
+
+//       message:
+//         "Variant updated",
+
+//       data: variant,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// export const deleteVariant = async (req: Request, res: Response, next: NextFunction) => {
+//   try {
+//     const { productId, variantId } = req.params;
+
+//     const product = await Product.findById(productId);
+
+//     if (!product) {
+//       return res.status(404).json({ success: false, message: "Product not found" });
+//     }
+
+//     if (product.ownerId.toString() !== req.user.id) {
+//       return res.status(403).json({ success: false, message: "Not authorized" });
+//     }
+
+//     product.variants = product.variants?.filter(v => v.id !== variantId);
+
+//     await product.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Variant deleted",
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 
 export const decreaseStock = async (productId: string, qty: number) => {
   const product = await Product.findById(productId);

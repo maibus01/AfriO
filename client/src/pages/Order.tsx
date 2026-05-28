@@ -23,9 +23,11 @@ const OrderPage = () => {
   const [processingOrder, setProcessingOrder] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Destructure incoming data
-  const { product, quantity, notes } = location.state || {};
-  const totalPrice = product ? product.price * quantity : 0;
+  // Destructure incoming dynamic state
+  const { product, quantity, notes, calculatedPrice } = location.state || {};
+  
+  // FIX: Uses calculated dynamic wholesale tiers passed down from the product page state
+  const totalPrice = calculatedPrice || (product ? (product.measurement?.pricePerUnit || product.basePrice) * quantity : 0);
 
   // =========================
   // 1. FETCH ACCOUNTS ON LOAD
@@ -73,7 +75,7 @@ const OrderPage = () => {
 
       const refNumber = res.data.order.refNumber || res.data.order._id.slice(-6).toUpperCase();
 
-      const rawMessage = `💎 *%F0%9F%92%8E LUXEE ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product:* ${product.name}\n*Quantity:* ${quantity}\n*Total Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment To:* ${selectedAccount.bankName}\nNote: I have made the transfer. Please verify.`;
+      const rawMessage = `💎 *%F0%9F%92%8E AFRIO ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product:* ${product.name}\n*Quantity:* ${quantity}\n*Total Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment To:* ${selectedAccount.bankName}\nNote: I have made the transfer. Please verify.`;
 
       const message = encodeURIComponent(rawMessage);
       const phone = "2349027456061";
@@ -117,12 +119,12 @@ const OrderPage = () => {
   }
 
   return (
-    <div className="bg-slate-50 dark:bg-black min-h-screen pb-40 select-none touch-manipulation">
+    <div className="bg-neutral-50 dark:bg-black min-h-screen pb-40 select-none touch-manipulation">
       {/* HEADERBAR */}
-      <div className="p-4 flex items-center gap-4 bg-white dark:bg-neutral-900 border-b border-slate-100 dark:border-neutral-800 sticky top-0 z-50">
+      <div className="p-4 flex items-center gap-4 bg-white dark:bg-neutral-900 border-b border-neutral-100 dark:border-neutral-800/60 sticky top-0 z-50">
         <button 
           onClick={() => navigate(-1)}
-          className="text-slate-900 dark:text-white p-1 rounded-lg active:bg-slate-100 dark:active:bg-neutral-800 transition-colors"
+          className="text-slate-900 dark:text-white p-1 rounded-lg active:bg-neutral-100 dark:active:bg-neutral-800 transition-colors"
         >
           <ArrowLeft size={22} />
         </button>
@@ -131,7 +133,7 @@ const OrderPage = () => {
 
       <div className="max-w-xl mx-auto p-4 space-y-4">
         {/* ORDER OVERVIEW CARD */}
-        <div className="bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-slate-100 dark:border-neutral-800/60 shadow-sm">
+        <div className="bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-neutral-100 dark:border-neutral-800/60 shadow-xs">
           <div className="flex justify-between items-start gap-4">
             <div>
               <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">
@@ -168,14 +170,14 @@ const OrderPage = () => {
                 onClick={() => setSelectedAccount(acc)}
                 className={`p-4 bg-white dark:bg-neutral-900 border-2 rounded-xl transition-all cursor-pointer ${
                   selectedAccount?._id === acc._id
-                    ? "border-amber-500 shadow-sm"
+                    ? "border-amber-500 shadow-xs"
                     : "border-transparent opacity-60"
                 }`}
               >
                 <div className="flex justify-between items-center mb-1">
                   <p className="font-bold text-slate-800 dark:text-neutral-100 text-sm">{acc.bankName}</p>
                   {selectedAccount?._id === acc._id && (
-                    <div className="w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-neutral-900 shadow-sm" />
+                    <div className="w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-neutral-900 shadow-xs" />
                   )}
                 </div>
                 <p className="text-xs font-semibold text-slate-500 dark:text-neutral-400 tracking-wider">{acc.accountNumber}</p>
@@ -184,7 +186,7 @@ const OrderPage = () => {
           )}
         </div>
 
-        {/* LUXEE DECORATIVE HARD TRANSFER INFO CARD */}
+        {/* TRANSFER CARD INFO */}
         {selectedAccount && (
           <div className="bg-slate-900 dark:bg-neutral-900 rounded-2xl p-5 text-white relative overflow-hidden border border-transparent dark:border-neutral-800/80 shadow-xl">
             <div className="relative z-10">
@@ -216,7 +218,6 @@ const OrderPage = () => {
                 </button>
               </div>
 
-              {/* STACKED LAYOUT GRID PREVENTS EXTENDED STRINGS BLURRING OUT */}
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start border-t border-white/5 dark:border-neutral-800 pt-4">
                 <div>
                   <p className="text-[9px] opacity-40 uppercase tracking-widest font-black mb-0.5">Bank Hub</p>
@@ -247,13 +248,13 @@ const OrderPage = () => {
         </div>
       </div>
 
-      {/* FLOAT RETAINER ACTION BAR OVERLAY - FORCED ON TOP OF ALL TABBAR SHELLS */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-black/95 backdrop-blur-md border-t border-slate-100 dark:border-neutral-900 z-[9999] shadow-[0_-8px_24px_rgba(0,0,0,0.02)]">
+      {/* FOOTER ACTION BAR */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-black/95 backdrop-blur-md border-t border-neutral-100 dark:border-neutral-900 z-[9999] shadow-[0_-8px_24px_rgba(0,0,0,0.02)]">
         <div className="max-w-xl mx-auto w-full">
           <button
             onClick={handleCompleteOrder}
             disabled={processingOrder || !selectedAccount}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-neutral-800 disabled:text-neutral-400 text-white py-3.5 rounded-xl font-black text-xs tracking-widest uppercase flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm shadow-emerald-900/10"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-200 dark:disabled:bg-neutral-800 disabled:text-neutral-400 text-white py-3.5 rounded-xl font-black text-xs tracking-widest uppercase flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-sm shadow-emerald-900/10"
           >
             {processingOrder ? (
               <Loader2 className="animate-spin w-4 h-4" />

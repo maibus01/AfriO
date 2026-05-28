@@ -16,6 +16,7 @@ import styleRoutes from "./routes/Style";
 import tailorRoutes from "./routes/TailorRequestRoute";
 import orderRoutes from "./routes/OrderRoute";
 import platformAccountRoutes from "./routes/PlatformAccaountRoute";
+import variantRoutes from "./routes/VariantRoute";
 
 const app: Application = express();
 
@@ -47,6 +48,7 @@ app.use("/api/business", businessRoutes);
 app.use("/api/measurements", measurementRoutes);
 app.use("/api/closet", closetRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/variants", variantRoutes);
 app.use("/api/styles", styleRoutes);
 app.use("/api/tailor-requests", tailorRoutes);
 app.use("/api/orders", orderRoutes);

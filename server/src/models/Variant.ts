@@ -1,127 +1,145 @@
-import mongoose, { Document, Schema, Model } from "mongoose";
+import mongoose, {
+  Document,
+  Schema,
+  Model,
+} from "mongoose";
 
 // =======================
 // INTERFACE
 // =======================
-export interface IVariant extends Document {
-    // RELATION
-    productId: mongoose.Types.ObjectId;
+export interface IVariant
+  extends Document {
+ 
+  businessId: mongoose.Types.ObjectId;
 
-    // FRONTEND MATCH
-    sku: string;
+  sku: string;
 
-    options: Record<string, string>;
+  options: Record<string, string>;
 
-    price: number;
+  price: number;
 
-    stock: number;
+  stock: number;
 
-    images: string[];
+  weight?: number;
 
-    // SYSTEM
-    businessId: mongoose.Types.ObjectId;
+  images: string[];
 
-    ownerId: mongoose.Types.ObjectId;
+  isActive: boolean;
 
-    isActive: boolean;
+  createdAt?: Date;
 
-    createdAt?: Date;
-
-    updatedAt?: Date;
+  updatedAt?: Date;
 }
 
 // =======================
 // SCHEMA
 // =======================
-const VariantSchema = new Schema<IVariant>(
+const VariantSchema =
+  new Schema<IVariant>(
     {
-        // =======================
-        // PRODUCT RELATION
-        // =======================
-        productId: {
-            type: Schema.Types.ObjectId,
-            ref: "Product",
-            required: true,
-        },
+        // =========================
+      // BUSINESS
+      // =========================
+      businessId: {
+        type: Schema.Types.ObjectId,
 
-        // =======================
-        // VARIANT DATA
-        // =======================
-        sku: {
-            type: String,
-            required: true,
-            trim: true,
-        },
+        ref: "Business",
 
-        options: {
-            type: Schema.Types.Mixed,
-            default: {},
-        },
+        required: true,
+      },
 
-        price: {
-            type: Number,
-            required: true,
-            min: 0,
-        },
+      // =========================
+      // SKU
+      // =========================
+      sku: {
+        type: String,
 
-        stock: {
-            type: Number,
-            default: 0,
-            min: 0,
-        },
+        required: true,
 
-        images: {
-            type: [String],
-            default: [],
-        },
+        trim: true,
+      },
 
-        // =======================
-        // OWNERSHIP
-        // =======================
-        businessId: {
-            type: Schema.Types.ObjectId,
-            ref: "Business",
-            required: true,
+      // =========================
+      // OPTIONS
+      // Example:
+      // { Color: "Red", Size: "XL" }
+      // =========================
+      options: {
+        type: Schema.Types.Mixed,
 
-        },
+        default: {},
+      },
 
-        ownerId: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-            index: true,
-        },
+      // =========================
+      // PRICE
+      // =========================
+      price: {
+        type: Number,
 
-        // =======================
-        // STATUS
-        // =======================
-        isActive: {
-            type: Boolean,
-            default: true,
-        },
+        required: true,
+
+        min: 0,
+      },
+
+      // =========================
+      // STOCK
+      // =========================
+      stock: {
+        type: Number,
+
+        default: 0,
+
+        min: 0,
+      },
+
+      // =========================
+      // OPTIONAL WEIGHT
+      // =========================
+      weight: {
+        type: Number,
+
+        min: 0,
+      },
+
+      // =========================
+      // IMAGES
+      // =========================
+      images: {
+        type: [String],
+
+        default: [],
+      },
+
+      // =========================
+      // STATUS
+      // =========================
+      isActive: {
+        type: Boolean,
+
+        default: true,
+      },
     },
     {
-        timestamps: true,
+      timestamps: true,
     }
-);
+  );
 
 // =======================
 // INDEXES
 // =======================
 VariantSchema.index({
-    productId: 1,
+  businessId: 1,
 });
 
 VariantSchema.index({
-    sku: 1,
-});
-
-VariantSchema.index({
-    businessId: 1,
+  sku: 1,
 });
 
 // =======================
 // MODEL
 // =======================
 export const Variant: Model<IVariant> =
-    mongoose.model<IVariant>("Variant", VariantSchema);
+  mongoose.model<IVariant>(
+    "Variant",
+    VariantSchema
+  );

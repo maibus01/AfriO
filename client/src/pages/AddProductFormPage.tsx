@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import {
-  X, Loader2, Layers, Tag, Package, UploadCloud, FileText,
+  X, Loader2, Layers, Tag, Package, UploadCloud,
   Scale, BarChart3, Maximize2, Globe, MapPin, Trash2, AlertCircle
 } from "lucide-react";
 import VariantBuilderPage from "./VariantBuilderPage";
 
-const API = "https://afrio-api.onrender.com/api";
+const API = typeof window !== "undefined" && window.location.hostname === "localhost"
+  ? "http://localhost:5000/api"
+  : "https://afrio-api.onrender.com/api";
 
 const CATEGORIES = [
   { value: "clothes", label: "Clothing & Apparel" },
@@ -41,15 +43,16 @@ const INITIAL_FORM_STATE = {
     weight: false,
     origin: false,
   },
+  attributes: {} as Record<string, string[]>,
   variants: [] as Array<{
     _id?: string;
     sku: string;
     options: Record<string, string>;
     price: number;
     stock: number;
-    images?: File[] | string[]; // ✅ ADD THIS
+    images?: File[] | string[];
   }>,
-  bulkPricing: [] as Array<{ minQty: number; price: number }>,
+  bulkPricing: [] as Array<{ minQty: number; maxQty?: number; price: number }>,
   measurement: {
     unit: "yard" as "meter" | "yard" | "kg" | "liter",
     pricePerUnit: "",
@@ -78,8 +81,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
   const [activeModal, setActiveModal] = useState<"variants" | "weight" | "measurement" | "bulkPricing" | "origin" | null>(null);
-
-  // Tracks binary objects allocated to child variant states if managing saves on parent form submission
   const [childVariantFiles, setChildVariantFiles] = useState<Record<string, File>>({});
 
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         console.error("Could not fetch profile context ID", err);
       }
     };
+
     fetchBusiness();
 
     if (editProductData) {
@@ -111,10 +113,15 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         productType: derivedType,
         basePrice: editProductData.basePrice?.toString() || "",
         stock: editProductData.stock?.toString() || "",
+        attributes: editProductData.attributes || {},
+        bulkPricing: editProductData.bulkPricing || [],
+        measurement: editProductData.measurement || INITIAL_FORM_STATE.measurement,
+        weightMetrics: editProductData.weightMetrics || INITIAL_FORM_STATE.weightMetrics,
+        origin: editProductData.origin || INITIAL_FORM_STATE.origin,
         features: {
-          bulkPricing: !!editProductData.features?.bulkPricing,
-          weight: !!editProductData.features?.weight,
-          origin: !!editProductData.features?.origin
+          bulkPricing: !!editProductData.features?.bulkPricing || (editProductData.bulkPricing?.length > 0),
+          weight: !!editProductData.features?.weight || !!editProductData.weightMetrics?.grossWeight,
+          origin: !!editProductData.features?.origin || !!editProductData.origin?.country
         }
       });
 
@@ -132,13 +139,12 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
 
     if (form.productType === "simple") {
       if (!form.basePrice || Number(form.basePrice) <= 0) { setErrorMessage("Simple products require a valid Base Price."); return false; }
-      if (!form.stock || Number(form.stock) < 0) { setErrorMessage("Please configure a valid stock capacity."); return false; }
+      if (form.stock === "" || Number(form.stock) < 0) { setErrorMessage("Please configure a valid stock capacity."); return false; }
     }
-
-    if (form.productType === "variant") {
-      if (form.variants.length === 0) { setErrorMessage("Variant Mode enabled, but no combinations exist. Run the Builder Matrix."); return false; }
+    if (form.productType === "variant" && form.variants.length === 0) {
+      setErrorMessage("Variant Mode enabled, but no configurations exist. Run the Builder Matrix.");
+      return false;
     }
-
     if (form.productType === "measured") {
       if (!form.measurement.pricePerUnit || Number(form.measurement.pricePerUnit) <= 0) { setErrorMessage("Measured products require a Price Per Unit."); return false; }
       if (!form.measurement.minOrder || Number(form.measurement.minOrder) <= 0) { setErrorMessage("Please establish a Minimum Unit Order value."); return false; }
@@ -148,32 +154,52 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
   };
 
   const compilePayload = () => {
+    const calculatedStock = form.productType === "variant"
+      ? form.variants.reduce((acc, curr) => acc + (Number(curr.stock) || 0), 0)
+      : Number(form.stock) || 0;
+
+    const hasBulk = form.bulkPricing.length > 0;
+    const hasWeight = !!form.weightMetrics.grossWeight;
+    const hasOrigin = !!form.origin.country;
+
     const payload: any = {
       name: form.name,
       description: form.description,
       category: form.category,
       condition: form.condition,
       currency: form.currency,
-      features: {
-        ...form.features,
-        variants: form.productType === "variant",
-        measurement: form.productType === "measured"
-      },
+      basePrice: form.basePrice !== "" ? Number(form.basePrice) : 0,
+      stock: calculatedStock,
       businessId: editProductData ? editProductData.businessId : businessId,
-      existingImages: existingImages
+      existingImages: existingImages,
+      attributes: form.attributes,
+      features: {
+        variants: form.productType === "variant",
+        attributes: Object.keys(form.attributes).length > 0,
+        size: !!form.attributes["size"] || !!form.attributes["Size"],
+        color: !!form.attributes["color"] || !!form.attributes["Color"],
+        weight: hasWeight,
+        measurement: form.productType === "measured",
+        bulkPricing: hasBulk,
+        origin: hasOrigin,
+      },
     };
 
-    // 🔥 FIX HERE
     if (form.productType === "variant") {
-      payload.basePrice = Number(form.basePrice) || 0;
-
-      payload.variants = form.variants;
-
-      payload.stock = form.variants.reduce(
-        (acc, curr) => acc + (Number(curr.stock) || 0),
-        0
-      );
+      payload.variants = [];
     }
+
+    if (form.productType === "measured") {
+      payload.measurement = {
+        unit: form.measurement.unit,
+        pricePerUnit: Number(form.measurement.pricePerUnit) || 0,
+        minOrder: Number(form.measurement.minOrder) || 1
+      };
+    }
+
+    if (hasBulk) payload.bulkPricing = form.bulkPricing;
+    if (hasWeight) payload.weightMetrics = form.weightMetrics;
+    if (hasOrigin) payload.origin = form.origin;
 
     return payload;
   };
@@ -181,7 +207,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
   const handleImagesUpload = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const filesArray = Array.from(files);
-
     setNewImageFiles((prev) => [...prev, ...filesArray]);
     const visualPreviews = filesArray.map((file) => URL.createObjectURL(file));
     setPreviewUrls((prev) => [...prev, ...visualPreviews]);
@@ -202,7 +227,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
 
     try {
       setUploading(true);
-      setUploadProgress(0);
+      setUploadProgress(10);
 
       const payload = compilePayload();
       const formData = new FormData();
@@ -226,7 +251,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         },
         onUploadProgress: (progressEvent: any) => {
           if (progressEvent.total) {
-            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            const percent = Math.round((progressEvent.loaded * 90) / progressEvent.total);
             setUploadProgress(percent);
           }
         }
@@ -235,25 +260,45 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
       if (editProductData) {
         await axios.patch(`${API}/products/${editProductData._id}`, formData, config);
       } else {
-        const response = await axios.post(
-          `${API}/products`,
-          formData,
-          config
-        );
-
+        const response = await axios.post(`${API}/products`, formData, config);
         const createdProduct = response.data.data;
 
+        if (form.productType === "variant" && createdProduct?._id && form.variants.length > 0) {
+          const createdVariantIds = [];
+
+          for (const variant of form.variants) {
+            const varData = new FormData();
+            varData.append("productId", createdProduct._id);
+            varData.append("businessId", businessId);
+            varData.append("sku", variant.sku);
+            varData.append("price", String(variant.price));
+            varData.append("stock", String(variant.stock));
+            varData.append("options", JSON.stringify(variant.options));
+
+            const color = variant.options.Color || variant.options.color;
+            if (color) {
+              const targetFile = childVariantFiles[`Color:${color}`] || childVariantFiles[`color:${color}`];
+              if (targetFile) varData.append("images", targetFile);
+            }
+
+            const res = await axios.post(`${API}/variants`, varData, {
+              headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+            });
+            createdVariantIds.push(res.data.data._id);
+          }
+
+          await axios.patch(
+            `${API}/products/${createdProduct._id}`,
+            { variants: createdVariantIds },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
       }
 
+      setUploadProgress(100);
       onCloseOrComplete();
     } catch (err: any) {
       console.error("Submission Error Details:", err);
-
-      console.error("STATUS:", err?.response?.status);
-
-      console.error("DATA:", err?.response?.data);
-
-      console.error("MESSAGE:", err?.message);
       const fallbackMsg = err?.response?.data?.message || "Operational issue executing catalog save schema.";
       setErrorMessage(fallbackMsg);
     } finally {
@@ -281,7 +326,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         <div className="p-6 space-y-6 max-h-[82vh] overflow-y-auto">
 
           {errorMessage && (
-            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl flex items-start gap-2.5 text-rose-800 dark:text-rose-400 text-xs shadow-sm animate-in fade-in duration-200">
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl flex items-start gap-2.5 text-rose-800 dark:text-rose-400 text-xs shadow-sm">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <div className="font-medium">{errorMessage}</div>
             </div>
@@ -311,6 +356,17 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                   <option value="used">Used / Pre-owned</option>
                   <option value="refurbished">Refurbished</option>
                 </select>
+                {/* ADD THIS UNDER THE PRODUCT TITLE SECTION */}
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 block mb-1.5">Description Summary</label>
+                  <textarea
+                    rows={4}
+                    value={form.description}
+                    placeholder="Describe your product in detail..."
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 resize-none"
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -325,8 +381,8 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                   type="button"
                   onClick={() => setForm({ ...form, productType: type })}
                   className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${form.productType === type
-                      ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-950 shadow-sm"
-                      : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-950 shadow-sm"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800"
                     }`}
                 >
                   <span className="text-xs font-bold capitalize">{type}</span>
@@ -382,8 +438,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
             <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Advanced System Functional Blocks</span>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-
-              {/* OPTIONS ENGINE */}
               {form.productType === "variant" && (
                 <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm sm:col-span-2">
                   <div className="flex items-center justify-between">
@@ -406,7 +460,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                 </div>
               )}
 
-              {/* UNIT ENGINE */}
               {form.productType === "measured" && (
                 <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm sm:col-span-2">
                   <div className="flex items-center justify-between">
@@ -424,7 +477,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                 </div>
               )}
 
-              {/* WHOLESALE BULK RATES */}
               <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200 font-bold text-xs">
@@ -432,7 +484,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                   </div>
                   <button type="button" onClick={() => setActiveModal("bulkPricing")} className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 font-bold text-[11px] px-2.5 py-1.5 rounded-lg text-zinc-700 dark:text-zinc-200 transition-colors">Configure</button>
                 </div>
-                {form.features.bulkPricing && form.bulkPricing.length > 0 ? (
+                {form.bulkPricing.length > 0 ? (
                   <div className="bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 p-2 rounded-lg text-[11px] font-medium border border-emerald-100/40 space-y-1">
                     <span className="font-bold block">✓ Bulk Scaling Levels:</span>
                     <div className="flex flex-wrap gap-1">
@@ -444,7 +496,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                 ) : <span className="text-[11px] text-zinc-400 italic px-0.5">No wholesale pricing tiers</span>}
               </div>
 
-              {/* LOGISTICS WEIGHT */}
               <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200 font-bold text-xs">
@@ -452,7 +503,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                   </div>
                   <button type="button" onClick={() => setActiveModal("weight")} className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 font-bold text-[11px] px-2.5 py-1.5 rounded-lg text-zinc-700 dark:text-zinc-200 transition-colors">Configure</button>
                 </div>
-                {form.features.weight && form.weightMetrics.grossWeight ? (
+                {form.weightMetrics.grossWeight ? (
                   <div className="bg-cyan-50/40 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 p-2 rounded-lg text-[11px] font-medium border border-cyan-100/40 space-y-0.5">
                     <div>• Gross: <span className="font-bold">{form.weightMetrics.grossWeight} {form.weightMetrics.unit}</span></div>
                     <div>• Net: <span className="font-bold">{form.weightMetrics.netWeight || "N/A"} {form.weightMetrics.unit}</span></div>
@@ -460,7 +511,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                 ) : <span className="text-[11px] text-zinc-400 italic px-0.5">No freight metrics tracked</span>}
               </div>
 
-              {/* GEOGRAPHIC PROVENANCE */}
               <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm sm:col-span-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200 font-bold text-xs">
@@ -468,14 +518,13 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                   </div>
                   <button type="button" onClick={() => setActiveModal("origin")} className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 font-bold text-[11px] px-2.5 py-1.5 rounded-lg text-zinc-700 dark:text-zinc-200 transition-colors">Configure</button>
                 </div>
-                {form.features.origin && form.origin.country ? (
+                {form.origin.country ? (
                   <div className="bg-teal-50/40 dark:bg-teal-950/20 text-teal-700 dark:text-teal-400 p-2 rounded-lg text-[11px] font-medium border border-teal-100/40 space-y-0.5 flex items-center gap-1.5">
                     <MapPin size={12} />
                     <span>Provenance Country: <span className="font-bold">{form.origin.city && `${form.origin.city}, `}{form.origin.country}</span></span>
                   </div>
                 ) : <span className="text-[11px] text-zinc-400 italic px-0.5">No provenance parameters logged</span>}
               </div>
-
             </div>
           </div>
 
@@ -514,7 +563,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                 {previewUrls.map((img, i) => (
                   <div key={`new-${i}`} className="relative w-14 h-14 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 shadow-sm group select-none">
                     <img src={img} className="w-full h-full object-cover" alt="" />
-                    <div className="absolute top-0 right-0 bg-teal-500 w-2 h-2 rounded-bl" title="Staged for next save" />
                     <button type="button" onClick={() => removeNewImage(i)} className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <Trash2 size={14} className="text-white" />
                     </button>
@@ -524,38 +572,265 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
             )}
           </div>
 
-          {/* DESCRIPTION SUMMARY */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 flex items-center gap-1.5"><FileText size={14} /> Description Summary</label>
-            <textarea value={form.description} rows={3} placeholder="Provide structured content descriptions..." className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-xs resize-none focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:text-zinc-100" onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          {/* MAIN SUBMIT ACTION BAR */}
+          <div className="pt-4 flex justify-end gap-3 border-t border-zinc-100 dark:border-zinc-800">
+            <button type="button" onClick={onCloseOrComplete} className="h-9 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors dark:text-zinc-200">
+              Cancel
+            </button>
+            <button type="button" onClick={handleSaveProduct} disabled={uploading} className="h-9 px-5 rounded-xl bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-950 text-xs font-bold transition-opacity hover:opacity-90 flex items-center gap-2">
+              {uploading && <Loader2 size={14} className="animate-spin" />}
+              {editProductData ? "Update Listing" : "Publish Listing"}
+            </button>
           </div>
 
-          <button onClick={handleSaveProduct} disabled={uploading} className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-300 disabled:text-zinc-500 text-white dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200 py-3 rounded-xl text-xs font-bold shadow-md transition-all tracking-wide uppercase">
-            {uploading ? `Processing catalog item (${uploadProgress}%)` : editProductData ? "Commit Document Changes" : "Publish Listing Data"}
-          </button>
         </div>
+
+        {/* ========================================== */}
+        {/* MODAL CONFIGURATION PORTAL PORTAL ENGINE   */}
+        {/* ========================================== */}
+        {activeModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="absolute top-4 right-4 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors"
+              >
+                <X size={16} />
+              </button>
+
+              {/* 1. CUSTOM UNIT SELLING MODULE */}
+              {activeModal === "measurement" && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Custom Unit Selling</h3>
+                    <p className="text-xs text-zinc-500">Define dimensional metrics or raw bulk properties.</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Unit Type Scale</label>
+                      <select
+                        value={form.measurement.unit}
+                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                        onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, unit: e.target.value as any } })}
+                      >
+                        <option value="yard">Yards (Fabric & Textiles)</option>
+                        <option value="meter">Meters</option>
+                        <option value="kg">Kilograms (Loose Weight Cargo)</option>
+                        <option value="liter">Liters (Liquids)</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Price per Unit ({form.currency})</label>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={form.measurement.pricePerUnit}
+                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                          onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, pricePerUnit: e.target.value } })}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Minimum Order Qty</label>
+                        <input
+                          type="number"
+                          placeholder="1"
+                          value={form.measurement.minOrder}
+                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                          onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, minOrder: e.target.value } })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. LOGISTICS WEIGHT MATRIX */}
+              {activeModal === "weight" && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Logistics Freight Dimensions</h3>
+                    <p className="text-xs text-zinc-500">Provide distribution weight profiles for freight processing.</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Gross Weight</label>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={form.weightMetrics.grossWeight}
+                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                          onChange={(e) => setForm({ ...form, weightMetrics: { ...form.weightMetrics, grossWeight: e.target.value } })}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Net Weight</label>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={form.weightMetrics.netWeight}
+                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                          onChange={(e) => setForm({ ...form, weightMetrics: { ...form.weightMetrics, netWeight: e.target.value } })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Scale Unit</label>
+                      <select
+                        value={form.weightMetrics.unit}
+                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                        onChange={(e) => setForm({ ...form, weightMetrics: { ...form.weightMetrics, unit: e.target.value } })}
+                      >
+                        <option value="kg">Kilograms (kg)</option>
+                        <option value="g">Grams (g)</option>
+                        <option value="lbs">Pounds (lbs)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. WHOLESALE BULK PRICING */}
+              {activeModal === "bulkPricing" && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Wholesale Volume Scaling</h3>
+                    <p className="text-xs text-zinc-500">Tiered minimum quantity rate adjustments.</p>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {form.bulkPricing.map((tier, index) => (
+                      <div key={index} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-950 p-2 rounded-lg border dark:border-zinc-800">
+                        <span className="text-[10px] text-zinc-400 font-mono">#{index + 1}</span>
+                        <input
+                          type="number"
+                          placeholder="Min Qty"
+                          value={tier.minQty}
+                          className="w-20 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-7 px-1.5 rounded text-xs dark:text-zinc-100 focus:outline-none"
+                          onChange={(e) => {
+                            const updated = [...form.bulkPricing];
+                            updated[index].minQty = Number(e.target.value);
+                            setForm({ ...form, bulkPricing: updated });
+                          }}
+                        />
+                        <span className="text-xs text-zinc-400">items → Price:</span>
+                        <input
+                          type="number"
+                          placeholder="Rate"
+                          value={tier.price}
+                          className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-7 px-1.5 rounded text-xs dark:text-zinc-100 focus:outline-none"
+                          onChange={(e) => {
+                            const updated = [...form.bulkPricing];
+                            updated[index].price = Number(e.target.value);
+                            setForm({ ...form, bulkPricing: updated });
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded shadow-sm"
+                          onClick={() => setForm({ ...form, bulkPricing: form.bulkPricing.filter((_, i) => i !== index) })}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {form.bulkPricing.length === 0 && (
+                      <div className="text-center py-4 text-xs italic text-zinc-400">No volume scaling parameters loaded yet.</div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full h-8 text-xs border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors font-semibold"
+                    onClick={() => setForm({ ...form, bulkPricing: [...form.bulkPricing, { minQty: 10, price: 0 }] })}
+                  >
+                    + Add Volume Tier Bracket
+                  </button>
+                </div>
+              )}
+
+              {/* 4. PROVENANCE ORIGIN */}
+              {activeModal === "origin" && (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Listing Provenance</h3>
+                    <p className="text-xs text-zinc-500">Log point of source manufacturing/generation.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Origin Country</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Nigeria"
+                        value={form.origin.country}
+                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                        onChange={(e) => setForm({ ...form, origin: { ...form.origin, country: e.target.value } })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">State / Region</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., Kano"
+                        value={form.origin.city}
+                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
+                        onChange={(e) => setForm({ ...form, origin: { ...form.origin, city: e.target.value } })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+
+              {/* 5. INDEPENDENT MODULE ATTACHMENT: VARIANT BUILDER MATRIX */}
+              {activeModal === "variants" && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 backdrop-blur-md p-4 overflow-y-auto">
+                  <div className="w-full max-w-3xl">
+                    <VariantBuilderPage
+                      businessId={businessId}
+                      baseName={form.name}
+                      basePrice={Number(form.basePrice) || 0}
+                      onClose={() => setActiveModal(null)}
+                      onSave={(generatedVariants, attributeFiles) => {
+                        const dynamicAttributesMap: Record<string, string[]> = {};
+                        generatedVariants.forEach((v) => {
+                          Object.entries(v.options).forEach(([key, val]) => {
+                            if (!dynamicAttributesMap[key]) dynamicAttributesMap[key] = [];
+                            if (!dynamicAttributesMap[key].includes(val)) dynamicAttributesMap[key].push(val);
+                          });
+                        });
+
+                        setForm((prev) => ({
+                          ...prev,
+                          variants: generatedVariants,
+                          attributes: dynamicAttributesMap
+                        }));
+
+                        setChildVariantFiles(attributeFiles);
+                        setActiveModal(null);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* SAVING CLOSING TRIGGER FOR POPUP PORTALS */}
+              <div className="mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="h-8 px-4 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-950 font-bold text-xs rounded-lg shadow-sm hover:opacity-90"
+                >
+                  Save & Return
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
       </div>
-
-      {/* OVERLAY SYSTEM BOUNDARIES */}
-      {activeModal === "variants" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-3xl">
-            <VariantBuilderPage
-              productId={editProductData?._id || "temp-new-product"}
-              baseName={form.name}
-              basePrice={Number(form.basePrice) || 0}
-              onClose={() => setActiveModal(null)}
-              onSave={(generatedVariants, attributeFiles) => {
-                // Keep the structural arrays in your form's central dataset
-                setForm((prev) => ({ ...prev, variants: generatedVariants }));
-                // Keep files safe for multi-part processing if needed later
-                setChildVariantFiles(attributeFiles);
-                setActiveModal(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

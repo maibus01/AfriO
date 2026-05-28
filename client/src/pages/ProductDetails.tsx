@@ -1,15 +1,18 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PhotoProvider, PhotoView } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
 import {
-  Heart, ArrowLeft, Share2, Sparkles,
-  ShoppingBag, Verified, ExternalLink, Plus, Minus, Layers
+  Heart, ArrowLeft, Share2, 
+  Verified, ExternalLink, Plus, Minus, Layers,
+  MessageSquare, ShoppingCart, ShieldCheck, Truck, Zap
 } from "lucide-react";
+import VariantSelector from "./VariantSelector";
 
-const API = "https://afrio-api.onrender.com/api";
+const API = typeof window !== "undefined" && window.location.hostname === "localhost"
+  ? "http://localhost:5000/api"
+  : "https://afrio-api.onrender.com/api";
 
-// Map currency codes to their respective native symbol
 const CURRENCY_SYMBOLS: Record<string, string> = {
   NGN: "₦",
   USD: "$",
@@ -17,68 +20,130 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: "£"
 };
 
+interface Measurement {
+  minOrder?: number;
+  pricePerUnit?: number;
+  unit?: string;
+}
+
+interface Variant {
+  _id: string;
+  sku?: string;
+  stock?: number;
+  price?: number;
+  images?: string[];
+  options?: Record<string, string>;
+}
+
+interface Origin {
+  country: string;
+  city: string;
+}
+
+interface Product {
+  _id: string;
+  name: string;
+  basePrice: number;
+  currency: string;
+  category?: string;
+  condition?: string;
+  stock?: number;
+  images?: string[];
+  description?: string;
+  businessId?: string | { _id: string; name: string };
+  features?: {
+    measurement?: boolean;
+  };
+  measurement?: Measurement;
+  variants?: Variant[];
+  origin?: Origin;
+}
+
 export default function ProductDetails() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   // Core Data States
-  const [product, setProduct] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [styles, setStyles] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Gallery & Purchase UX States
-  const [currentImage, setCurrentImage] = useState(0);
-  const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
-  const [notes, setNotes] = useState("");
+  const [currentImage, setCurrentImage] = useState<number>(0);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [notes, setNotes] = useState<string>("");
+  const [isLiked, setIsLiked] = useState<boolean>(false);
+
+  // Matrix Wholesale States (Alibaba Style)
+  const [selectedMatrixOrders, setSelectedMatrixOrders] = useState<Array<{ variant: Variant; qty: number }>>([]);
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState<boolean>(false);
 
   const galleryRef = useRef<HTMLDivElement>(null);
   const thumbnailsRef = useRef<HTMLDivElement>(null);
 
-  const fetchData = async () => {
-    if (!id || id === "undefined") return;
-    setLoading(true);
-    try {
-      const prodRes = await fetch(`${API}/products/${id}`);
-      const prodData = await prodRes.json();
-      const currentProduct = prodData.data;
-      setProduct(currentProduct);
-
-      // Pre-select first variant if item uses variations
-      if (currentProduct?.features?.variants && currentProduct.variants?.length > 0) {
-        setSelectedVariant(currentProduct.variants[0]);
-      }
-
-      // Initialize quantity correctly based on measurement rules
-      if (currentProduct?.features?.measurement && currentProduct.measurement) {
-        setQuantity(currentProduct.measurement.minOrder || 1);
-      } else {
-        setQuantity(1);
-      }
-
-      // Parallel secondary lookups
-      await Promise.all([
-        fetch(`${API}/products`).then(res => res.json()).then(d => setProducts(d.data || [])),
-        fetch(`${API}/styles`).then(res => res.json()).then(d => setStyles(d.data || []))
-      ]);
-    } catch (error) { 
-      console.error("Error fetching product data ecosystem:", error); 
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    window.scrollTo(0, 0);
-    resetGalleryState();
-  }, [id]);
-
-  const resetGalleryState = () => {
+  const resetGalleryState = useCallback(() => {
     setCurrentImage(0);
     if (galleryRef.current) galleryRef.current.scrollLeft = 0;
     if (thumbnailsRef.current) thumbnailsRef.current.scrollLeft = 0;
+  }, []);
+
+  useEffect(() => {
+    if (!id || id === "undefined") return;
+
+    const controller = new AbortController();
+    
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const prodRes = await fetch(`${API}/products/${id}`, { signal: controller.signal });
+        const prodData = await prodRes.json();
+        const currentProduct: Product = prodData.data;
+        
+        setProduct(currentProduct);
+
+        if (currentProduct?.measurement?.minOrder) {
+          setQuantity(currentProduct.measurement.minOrder);
+        } else {
+          setQuantity(1);
+        }
+      } catch (error: any) { 
+        if (error.name !== "AbortError") {
+          console.error("Error fetching product details:", error); 
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    window.scrollTo(0, 0);
+    resetGalleryState();
+
+    return () => {
+      controller.abort();
+    };
+  }, [id, resetGalleryState]);
+
+  // Gallery Mechanics
+  const imagesList = useMemo<string[]>(() => {
+    if (!product) return ["https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500"];
+    const variantImages = product.variants?.flatMap((v) => v.images || []).filter(Boolean) as string[] || [];
+    const rawImagesList = [...(product.images || []), ...variantImages];
+    return rawImagesList.length > 0 ? rawImagesList : ["https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500"];
+  }, [product]);
+
+  const scrollToActiveThumbnail = (index: number) => {
+    if (!thumbnailsRef.current) return;
+    const thumbsContainer = thumbnailsRef.current;
+    const activeThumb = thumbsContainer.children[index] as HTMLElement;
+
+    if (activeThumb) {
+      const containerWidth = thumbsContainer.offsetWidth;
+      const activeThumbWidth = activeThumb.offsetWidth;
+      const activeThumbLeft = activeThumb.offsetLeft;
+      const desiredScrollLeft = activeThumbLeft - (containerWidth / 2) + (activeThumbWidth / 2);
+
+      thumbsContainer.scrollTo({ left: desiredScrollLeft, behavior: 'smooth' });
+    }
   };
 
   const handleGalleryScroll = () => {
@@ -87,7 +152,7 @@ export default function ProductDetails() {
     const scrollLeft = galleryRef.current.scrollLeft;
     const index = Math.round(scrollLeft / width);
 
-    if (index !== currentImage && index >= 0) {
+    if (index !== currentImage && index >= 0 && index < imagesList.length) {
       setCurrentImage(index);
       scrollToActiveThumbnail(index);
     }
@@ -102,69 +167,57 @@ export default function ProductDetails() {
     scrollToActiveThumbnail(index);
   };
 
-  const scrollToActiveThumbnail = (index: number) => {
-    if (!thumbnailsRef.current) return;
-    const thumbsContainer = thumbnailsRef.current;
-    const activeThumb = thumbsContainer.children[index] as HTMLElement;
+  // Wholesale Engine calculations
+  const currentUnitPrice = useMemo<number>(() => {
+    if (!product) return 0;
+    const price = product.measurement?.pricePerUnit || product.basePrice;
+    if (quantity >= 500) return price * 0.95; // 5% bulk discount
+    return price;
+  }, [product, quantity]);
 
-    if (activeThumb) {
-      const containerWidth = thumbsContainer.offsetWidth;
-      const activeThumbWidth = activeThumb.offsetWidth;
-      const activeThumbLeft = activeThumb.offsetLeft;
-      const desiredScrollLeft = activeThumbLeft - (containerWidth / 2) + (activeThumbWidth / 2);
+  const totalCalculatedPrice = useMemo<number>(() => {
+    return currentUnitPrice * quantity;
+  }, [currentUnitPrice, quantity]);
 
-      thumbsContainer.scrollTo({
-        left: desiredScrollLeft,
-        behavior: 'smooth'
-      });
+  const currentMaxStock = useMemo<number>(() => {
+    if (product?.variants && product.variants.length > 0) {
+      return product.variants.reduce((sum, v) => sum + (v.stock || 0), 0);
     }
-  };
+    return product?.stock ?? 0;
+  }, [product]);
 
-  const handleVariantChange = (variant: any) => {
-    setSelectedVariant(variant);
-    // If variant has unique assets, jump slider preview to its first dedicated image asset
-    if (variant.images && variant.images.length > 0) {
-      const variantImgIndex = imagesList.indexOf(variant.images[0]);
-      if (variantImgIndex !== -1) {
-        handleThumbClick(variantImgIndex);
-      }
+  const minAllowedQty = useMemo<number>(() => {
+    if (product?.features?.measurement && product.measurement) {
+      return product.measurement.minOrder || 1;
     }
-  };
+    return 1;
+  }, [product]);
 
-  const handleBuyNow = () => {
+  const handleStartOrder = () => {
+    if (!product) return;
     navigate("/order", {
       state: {
         product,
-        selectedVariant,
+        matrixOrders: selectedMatrixOrders.length > 0 ? selectedMatrixOrders : null,
         quantity,
         notes,
-        calculatedPrice: currentUnitPrice * quantity
+        calculatedPrice: totalCalculatedPrice,
+        checkoutType: "direct_order"
       }
     });
   };
 
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-slate-50 dark:bg-black flex flex-col justify-start items-center p-4 md:p-8">
+      <div className="w-full min-h-screen bg-neutral-100 dark:bg-black flex flex-col justify-start items-center p-4">
         <div className="w-full max-w-7xl space-y-6 mt-16 animate-pulse">
           <div className="flex flex-col md:flex-row gap-6">
             <div className="w-full md:w-1/2 space-y-3">
-              <div className="w-full aspect-square bg-slate-200 dark:bg-neutral-900 rounded-2xl" />
-              <div className="flex gap-2.5">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-16 h-16 bg-slate-200 dark:bg-neutral-900 rounded-lg" />
-                ))}
-              </div>
+              <div className="w-full aspect-square bg-neutral-200 dark:bg-neutral-900 rounded-2xl" />
             </div>
-            <div className="flex-1 bg-white dark:bg-neutral-900 border border-slate-200/60 dark:border-neutral-800/80 rounded-2xl p-6 md:p-8 space-y-6">
-              <div className="space-y-2">
-                <div className="h-3 w-20 bg-slate-200 dark:bg-neutral-800 rounded" />
-                <div className="h-7 w-3/4 bg-slate-300 dark:bg-neutral-800 rounded-xl" />
-                <div className="h-5 w-32 bg-slate-200 dark:bg-neutral-800 rounded-lg" />
-              </div>
-              <div className="h-14 w-full bg-slate-100 dark:bg-neutral-950 rounded-xl" />
-              <div className="h-12 w-full bg-slate-100 dark:bg-neutral-950 rounded-xl" />
-              <div className="h-14 w-full bg-slate-300 dark:bg-neutral-800 rounded-xl" />
+            <div className="flex-1 bg-white dark:bg-neutral-900 rounded-2xl p-6 space-y-6">
+              <div className="h-7 w-3/4 bg-neutral-300 dark:bg-neutral-800 rounded-xl" />
+              <div className="h-14 w-full bg-neutral-100 dark:bg-neutral-950 rounded-xl" />
             </div>
           </div>
         </div>
@@ -174,85 +227,66 @@ export default function ProductDetails() {
 
   if (!product) return null;
 
-  // Compile full image list combining parent root images and item variation images safely
-  const variantImages = product.variants?.flatMap((v: any) => v.images || []).filter(Boolean) || [];
-  const rawImagesList = [...(product.images || []), ...variantImages];
-  const imagesList = rawImagesList.length > 0 ? rawImagesList : ["https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500"];
-
-  // Currency calculations handler
   const visualCurrency = CURRENCY_SYMBOLS[product.currency] || product.currency || "₦";
-
-  // Dynamic pricing evaluation engine based on architecture toggles
-  let currentUnitPrice = product.basePrice || 0;
-  if (product.features?.measurement && product.measurement) {
-    currentUnitPrice = product.measurement.pricePerUnit || currentUnitPrice;
-  } else if (product.features?.variants && selectedVariant) {
-    currentUnitPrice = selectedVariant.price || currentUnitPrice;
-  }
-
-  // Dynamic stock assessment mapping bounds
-  const currentMaxStock = product.features?.variants && selectedVariant 
-    ? selectedVariant.stock 
-    : (product.stock ?? 0);
-
-  const minAllowedQty = product.features?.measurement && product.measurement 
-    ? (product.measurement.minOrder || 1) 
-    : 1;
-
-  // Safety extraction metrics for business components
   const businessIdString = typeof product.businessId === "object" ? product.businessId?._id : product.businessId;
-  const businessName = product.businessId?.name || "Verified Merchant";
+  const businessName = typeof product.businessId === "object" ? product.businessId?.name : "Verified Supplier";
 
   return (
     <PhotoProvider maskOpacity={0.95}>
-      <main className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-neutral-100 pb-32 select-none touch-manipulation">
+      <main className="min-h-screen bg-neutral-100 dark:bg-black text-slate-900 dark:text-neutral-100 pb-40 select-none touch-manipulation">
 
-        {/* NATIVE FLOATING NAVIGATION HEADER */}
-        <nav className="fixed top-0 left-0 right-0 p-4 flex justify-between items-center z-50">
+        {/* FLOATING TOP BAR NAVIGATION */}
+        <nav className="fixed top-0 left-0 right-0 p-4 flex justify-between items-center z-40 pointer-events-none">
           <button
             onClick={() => navigate(-1)}
-            className="p-2.5 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md text-slate-900 dark:text-white rounded-xl shadow-sm border border-slate-200/40 dark:border-neutral-800"
+            className="pointer-events-auto p-2.5 bg-neutral-900/60 dark:bg-neutral-900/90 backdrop-blur-md text-white rounded-full shadow-md border border-white/10 active:scale-95 transition-transform"
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="flex gap-2">
-            <button className="p-2.5 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md text-slate-900 dark:text-white rounded-xl shadow-sm border border-slate-200/40 dark:border-neutral-800">
+          <div className="flex gap-2 pointer-events-auto">
+            <button className="p-2.5 bg-neutral-900/60 dark:bg-neutral-900/90 backdrop-blur-md text-white rounded-full shadow-md border border-white/10 active:scale-95 transition-transform">
               <Share2 size={18} />
             </button>
-            <button className="p-2.5 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md text-neutral-400 dark:text-neutral-500 rounded-xl shadow-sm border border-slate-200/40 dark:border-neutral-800 active:text-red-500">
-              <Heart size={18} />
+            <button 
+              onClick={() => setIsLiked(!isLiked)} 
+              className={`p-2.5 bg-neutral-900/60 dark:bg-neutral-900/90 backdrop-blur-md rounded-full shadow-md border border-white/10 transition-colors active:scale-95 ${isLiked ? 'text-amber-500' : 'text-white'}`}
+            >
+              <Heart size={18} className={isLiked ? "fill-amber-500 text-amber-500" : ""} />
             </button>
           </div>
         </nav>
 
-        {/* APPARATUS CONTAINER */}
-        <div className="max-w-7xl mx-auto md:pt-20 md:px-6">
-          <div className="flex flex-col md:flex-row gap-6">
+        {/* MAIN BODY CONTAINER */}
+        <div className="max-w-7xl mx-auto md:pt-16 md:px-4">
+          <div className="flex flex-col md:flex-row gap-4">
 
-            {/* APP GALLERY CANVAS SYSTEM */}
-            <div className="w-full md:w-1/2 relative space-y-3">
+            {/* PRODUCT IMAGES GALLERY */}
+            <div className="w-full md:w-5/12 relative bg-white dark:bg-neutral-900 md:rounded-2xl overflow-hidden shadow-sm self-start">
               <div
                 ref={galleryRef}
                 onScroll={handleGalleryScroll}
-                className="w-full aspect-square bg-white dark:bg-neutral-900 flex overflow-x-auto snap-x snap-mandatory scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                className="w-full aspect-square flex overflow-x-auto snap-x snap-mandatory scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
               >
                 {imagesList.map((img: string, i: number) => (
                   <div key={i} className="w-full h-full flex-shrink-0 snap-center cursor-pointer">
                     <PhotoView src={img}>
-                      <img src={img} className="w-full h-full object-cover" alt={`${product.name} component ${i}`} />
+                      <img src={img} className="w-full h-full object-contain bg-white dark:bg-neutral-900" alt="" />
                     </PhotoView>
                   </div>
                 ))}
               </div>
 
-              {/* THUMBNAIL TRACK SLIDER */}
-              <div ref={thumbnailsRef} className="flex gap-2.5 px-4 md:px-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth">
+              <div className="absolute bottom-4 right-4 bg-black/60 text-white text-[11px] font-medium px-2.5 py-0.5 rounded-full backdrop-blur-xs">
+                {currentImage + 1} / {imagesList.length}
+              </div>
+
+              <div ref={thumbnailsRef} className="hidden md:flex gap-2 p-4 overflow-x-auto border-t border-neutral-100 dark:border-neutral-800/60 scroll-smooth">
                 {imagesList.map((img: string, i: number) => (
                   <button
                     key={i}
                     onClick={() => handleThumbClick(i)}
-                    className={`relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                      currentImage === i ? 'border-amber-500 scale-100 opacity-100' : 'border-slate-100 dark:border-neutral-800/60 opacity-60'
+                    className={`w-14 h-14 flex-shrink-0 rounded-md overflow-hidden border-2 transition-all ${
+                      currentImage === i ? 'border-amber-500 opacity-100' : 'border-transparent opacity-50'
                     }`}
                   >
                     <img src={img} className="w-full h-full object-cover" alt="" />
@@ -261,151 +295,115 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* DETAILS METRICS AND CHECKOUT ACTION BAR */}
-            <div className="flex-1 px-4 md:px-0">
-              <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800/60 p-5 md:p-8 rounded-2xl shadow-sm">
-                
-                <div className="flex flex-col mb-5">
-                  <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1">
-                    {product.category || 'Exclusive Line'} • <span className="capitalize">{product.condition}</span>
+            {/* PRODUCT SPECS & ACTIONS RIGHT PANEL */}
+            <div className="flex-1 space-y-3">
+              
+              {/* BRANDING & PRICE CONTAINER */}
+              <div className="bg-white dark:bg-neutral-900 p-4 md:p-6 md:rounded-2xl shadow-xs border-b md:border border-neutral-200/40 dark:border-neutral-800/60">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-sm inline-block">
+                    {product.category || 'Wholesale Hub'} • {product.condition || 'New'}
                   </span>
-                  <h1 className="text-xl md:text-3xl font-extrabold text-slate-900 dark:text-white mb-2 tracking-tight">
+                  <h1 className="text-base md:text-xl font-bold text-slate-900 dark:text-white leading-snug tracking-tight">
                     {product.name}
                   </h1>
-                  
-                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-2xl font-black text-slate-900 dark:text-amber-400">
+                </div>
+
+                <div className="mt-4 p-3 bg-gradient-to-r from-amber-50/60 to-amber-100/20 dark:from-neutral-950 dark:to-neutral-950 rounded-xl border border-amber-100/40 dark:border-neutral-800">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl md:text-3xl font-black text-amber-600 dark:text-amber-500">
                       {visualCurrency}{currentUnitPrice.toLocaleString()}
-                      {product.features?.measurement && product.measurement && (
-                        <span className="text-xs text-slate-400 font-medium font-sans"> / {product.measurement.unit}</span>
-                      )}
-                    </p>
-                    {currentMaxStock > 0 ? (
-                      <span className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
-                        {currentMaxStock} Units Available
-                      </span>
-                    ) : (
-                      <span className="bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Out of Stock</span>
-                    )}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">
+                      /{product.measurement?.unit || 'Piece'}
+                    </span>
+                  </div>
+                  
+                  <div className="mt-2 pt-2 border-t border-amber-200/20 flex justify-between text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+                    <div>MOQ: <span className="text-slate-900 dark:text-white font-bold">{minAllowedQty} {product.measurement?.unit || 'Units'}</span></div>
+                    <div>Availability: <span className={currentMaxStock > 0 ? "text-emerald-600 font-bold" : "text-rose-500 font-bold"}>{currentMaxStock > 0 ? `${currentMaxStock} Pieces` : 'Out of Stock'}</span></div>
                   </div>
                 </div>
 
-                {/* VERIFIED RETAILER ROUTING COMPONENT */}
-                {businessIdString && (
-                  <div
-                    onClick={() => navigate(`/business/${businessIdString}/public`)}
-                    className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-neutral-950 border border-slate-100 dark:border-neutral-800/40 rounded-xl mb-6 cursor-pointer"
-                  >
-                    <div className="w-9 h-9 bg-neutral-900 dark:bg-amber-500 rounded-lg flex items-center justify-center text-white dark:text-black font-black text-xs">
-                      {businessName.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-slate-900 dark:text-neutral-100 text-xs flex items-center gap-1">
-                        {businessName} <Verified size={12} className="text-blue-500 fill-blue-500" />
-                      </h4>
-                      <p className="text-[9px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-wider">Verified Merchant</p>
-                    </div>
-                    <ExternalLink size={14} className="text-slate-300 dark:text-neutral-700" />
+                <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-neutral-400 pt-2">
+                  <div className="flex items-center gap-2">
+                    <img src="https://flagcdn.com/16x12/ng.png" className="w-3.5 h-2.5 rounded-xs inline-block" alt="" />
+                    <Truck size={14} className="text-slate-400" />
+                    <span>Shipping metrics calculated at transaction generation</span>
                   </div>
-                )}
-
-                {/* DYNAMIC PRODUCT ATTRIBUTES & VARIANTS COMPONENT */}
-                {product.features?.variants && product.variants && product.variants.length > 0 && (
-                  <div className="mb-6 p-4 bg-slate-50 dark:bg-neutral-950 rounded-xl border border-slate-100 dark:border-neutral-800/40 space-y-3">
-                    <div className="flex items-center gap-1.5 text-slate-400 dark:text-neutral-500">
-                      <Layers size={12} />
-                      <span className="font-black text-[9px] uppercase tracking-wider">Select Style Options</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {product.variants.map((v: any) => {
-                        const variantOptionLabel = Object.values(v.options || {}).join(" - ");
-                        const isSelected = selectedVariant?.id === v.id;
-                        return (
-                          <button
-                            key={v.id}
-                            onClick={() => handleVariantChange(v)}
-                            className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${
-                              isSelected
-                                ? "bg-neutral-900 dark:bg-amber-500 text-white dark:text-black border-transparent shadow-sm"
-                                : "bg-white dark:bg-neutral-900 text-slate-800 dark:text-neutral-200 border-slate-200 dark:border-neutral-800 hover:border-slate-400"
-                            }`}
-                          >
-                            {variantOptionLabel || v.sku}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* QUANTITY INPUT SHEET MANAGEMENT BAR */}
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-neutral-950 rounded-xl border border-slate-100 dark:border-neutral-800/40">
-                    <div className="flex flex-col ml-2">
-                      <span className="font-black text-[9px] uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                        {product.features?.measurement && product.measurement ? `Order Volume (${product.measurement.unit}s)` : "Quantity"}
-                      </span>
-                      {product.features?.measurement && product.measurement && (
-                        <span className="text-[8px] text-amber-600 dark:text-amber-400 font-bold">Min Order: {product.measurement.minOrder}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button 
-                        onClick={() => setQuantity(Math.max(minAllowedQty, quantity - 1))} 
-                        className="w-9 h-9 bg-white dark:bg-neutral-900 rounded-lg shadow-sm flex items-center justify-center text-slate-900 dark:text-white border dark:border-neutral-800 active:scale-95 transition-transform"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <span className="font-black text-sm w-8 text-center">{quantity}</span>
-                      <button 
-                        onClick={() => setQuantity(currentMaxStock ? Math.min(currentMaxStock, quantity + 1) : quantity + 1)} 
-                        className="w-9 h-9 bg-neutral-900 dark:bg-amber-500 rounded-lg shadow-sm flex items-center justify-center text-white dark:text-black active:scale-95 transition-transform"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* CUSTOM PREFERENCES TEXTAREA */}
-                  <div>
-                    <label className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 mb-1.5 block">Custom Fabric & Tailoring Requests</label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Specify size measurements, tailoring cuts, color confirmations, or delivery specifications..."
-                      className="w-full bg-slate-50 dark:bg-neutral-950 border border-transparent dark:border-neutral-800/60 rounded-xl p-4 text-xs font-medium focus:outline-none focus:border-amber-500 text-slate-900 dark:text-white resize-none min-h-[85px]"
-                    />
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={14} className="text-emerald-500" />
+                    <span>Trade Assurance safeguards your orders</span>
                   </div>
                 </div>
-
-                {/* PURCHASE ENGAGEMENT TRIGGER */}
-                <button
-                  onClick={handleBuyNow}
-                  disabled={currentMaxStock <= 0}
-                  className={`w-full py-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-98 ${
-                    currentMaxStock <= 0 
-                      ? "bg-slate-200 dark:bg-neutral-800 text-slate-400 dark:text-neutral-600 cursor-not-allowed" 
-                      : "bg-neutral-900 dark:bg-amber-500 text-white dark:text-black"
-                  }`}
-                >
-                  <ShoppingBag size={16} />
-                  {currentMaxStock <= 0 ? "Out of Stock" : `Confirm Order • ${visualCurrency}${(currentUnitPrice * quantity).toLocaleString()}`}
-                </button>
               </div>
 
-              {/* ORIGIN & SPECIFICATION LOGS */}
-              {product.features?.origin && product.origin && (
-                <div className="mt-4 mx-1 p-3 bg-slate-100/60 dark:bg-neutral-950/40 rounded-xl border border-slate-200/20 flex gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <div>Origin: <span className="text-slate-900 dark:text-neutral-200 font-black">{product.origin.country}</span></div>
-                  <div>Hub: <span className="text-slate-900 dark:text-neutral-200 font-black">{product.origin.city}</span></div>
+              {/* SUPPLIER INFO */}
+              {businessIdString && (
+                <div
+                  onClick={() => navigate(`/business/${businessIdString}/public`)}
+                  className="bg-white dark:bg-neutral-900 p-4 md:rounded-2xl shadow-xs flex items-center justify-between border-y md:border border-neutral-200/40 dark:border-neutral-800/40 cursor-pointer hover:opacity-95 transition-opacity"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-amber-600 text-white rounded-lg flex items-center justify-center font-black text-sm shadow-inner">
+                      {businessName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 dark:text-neutral-100 text-xs flex items-center gap-1">
+                        {businessName} <Verified size={13} className="text-amber-500 fill-amber-500" />
+                      </h4>
+                      <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-0.5">Verified Supplier</p>
+                    </div>
+                  </div>
+                  <ExternalLink size={14} className="text-slate-400" />
                 </div>
               )}
 
-              {/* PRODUCT SUMMARY DETAILS */}
-              <div className="mt-6 px-1">
-                <h3 className="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest mb-2">Overview Details</h3>
-                <p className="text-slate-500 dark:text-neutral-400 leading-relaxed text-xs">
-                  {product.description?.trim() ? product.description : "No additional description specified for this exclusive luxury piece."}
+              {/* VARIATION SELECTOR */}
+              {product.variants && product.variants.length > 0 && (
+                <VariantSelector
+                  variants={product.variants || []}
+                  measurement={product.measurement}
+                  basePrice={product.basePrice}
+                  currencySymbol={visualCurrency}
+                  defaultImage={imagesList[0]}
+                  isOpen={isVariantModalOpen}
+                  setIsOpen={setIsVariantModalOpen}
+                  onConfirm={(orders) => {
+                    setSelectedMatrixOrders(orders);
+                    const totalQty = orders.reduce((sum, o) => sum + o.qty, 0);
+                    if (totalQty > 0) setQuantity(totalQty);
+                  }}
+                />
+              )}
+
+              {/* MANUAL QUANTITY CONTROLLER (SHOWS IF NO VARIANTS Exist) */}
+            
+
+              {/* SOURCING REQUIREMENTS */}
+              <div className="bg-white dark:bg-neutral-900 p-4 md:rounded-2xl shadow-xs border-y md:border border-neutral-200/40 dark:border-neutral-800/60">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Sourcing Requirements</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Specify custom branding parameters, tailoring configurations, or special delivery logistics..."
+                  className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-200/60 dark:border-neutral-800 rounded-xl p-3 text-xs focus:outline-none focus:border-amber-500 text-slate-900 dark:text-white resize-none min-h-[75px] transition-colors"
+                />
+              </div>
+
+              {/* ORIGIN REGIONS */}
+              {product.origin && (
+                <div className="p-3 bg-white dark:bg-neutral-900 md:rounded-2xl border-y md:border border-neutral-200/40 dark:border-neutral-800/60 flex gap-6 text-[11px] text-slate-500">
+                  <div>Export Region: <span className="text-slate-900 dark:text-neutral-200 font-bold">{product.origin.country}</span></div>
+                  <div>Distribution Hub: <span className="text-slate-900 dark:text-neutral-200 font-bold">{product.origin.city}</span></div>
+                </div>
+              )}
+
+              {/* SPECIFICATIONS */}
+              <div className="bg-white dark:bg-neutral-900 p-4 md:rounded-2xl shadow-xs border-y md:border border-neutral-200/40 dark:border-neutral-800/60">
+                <h3 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wide mb-2">Product Specifications</h3>
+                <p className="text-slate-600 dark:text-neutral-400 leading-relaxed text-xs">
+                  {product.description?.trim() ? product.description : "No additional specifications declared for this B2B wholesale item."}
                 </p>
               </div>
 
@@ -413,59 +411,40 @@ export default function ProductDetails() {
           </div>
         </div>
 
-        {/* FEED SECTIONS (STYLE INSPO & RETAILER SHOWCASE) */}
-        <div className="max-w-7xl mx-auto px-4 mt-12">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="text-amber-500" size={16} />
-              <h2 className="text-lg font-black tracking-tight dark:text-white">Style Inspo</h2>
-            </div>
-            <button className="text-[9px] font-black uppercase text-slate-400 dark:text-neutral-500 tracking-wider">View All</button>
-          </div>
+        {/* BOTTOM FIXED APP ACTION BAR */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 px-4 py-3 z-30 flex items-center justify-between gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+          <button className="flex flex-col items-center justify-center text-slate-600 dark:text-neutral-400 active:scale-95 transition-transform px-2">
+            <MessageSquare size={20} className="text-slate-700 dark:text-neutral-300" />
+            <span className="text-[10px] mt-0.5 font-medium whitespace-nowrap">Chat Now</span>
+          </button>
 
-          <div className="flex gap-3.5 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-6">
-            {styles.map((s) => (
-              <div
-                key={s._id}
-                onClick={() => navigate(`/style/${s._id}`)}
-                className="min-w-[140px] md:min-w-[200px] aspect-[3/4] rounded-xl overflow-hidden relative group cursor-pointer border border-transparent dark:border-neutral-800"
-              >
-                <img src={s.image} className="w-full h-full object-cover" alt="" />
-                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/20 to-transparent opacity-90" />
-                <div className="absolute bottom-3 left-3 right-3">
-                  <p className="text-white text-xs font-bold leading-tight line-clamp-2 uppercase tracking-wide">{s.title}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <div className="flex-1 grid grid-cols-2 gap-2">
+            <button
+              disabled={currentMaxStock <= 0}
+              onClick={() => setIsVariantModalOpen(true)}
+              className="w-full h-11 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 border border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-50/30 dark:bg-transparent disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ShoppingCart size={14} />
+              <span>Add to Cart</span>
+            </button>
 
-          <div className="flex items-center gap-1.5 mb-5 mt-4">
-            <ShoppingBag className="text-amber-500" size={16} />
-            <h2 className="text-lg font-black tracking-tight dark:text-white">Store Showcase</h2>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3.5">
-            {products.slice(0, 6).map((p) => {
-              const alternativeCurrency = CURRENCY_SYMBOLS[p.currency] || p.currency || "₦";
-              const alternativePrice = p.basePrice || p.measurement?.pricePerUnit || p.variants?.[0]?.price || 0;
-              return (
-                <div
-                  key={p._id}
-                  onClick={() => navigate(`/product/${p._id}`)}
-                  className="bg-white dark:bg-neutral-900 rounded-xl overflow-hidden border border-slate-200/60 dark:border-neutral-800 shadow-sm cursor-pointer"
-                >
-                  <div className="aspect-square bg-slate-50 dark:bg-neutral-950 overflow-hidden relative">
-                    <img src={p.images?.[0] || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500"} className="w-full h-full object-cover" alt="" />
-                  </div>
-                  <div className="p-3">
-                    <p className="font-bold text-slate-800 dark:text-neutral-200 text-xs line-clamp-1 mb-1">{p.name}</p>
-                    <p className="text-slate-900 dark:text-white font-black text-sm">{alternativeCurrency}{alternativePrice.toLocaleString()}</p>
-                  </div>
-                </div>
-              );
-            })}
+            <button
+              onClick={() => {
+                if (product.variants && product.variants.length > 0 && selectedMatrixOrders.length === 0) {
+                  setIsVariantModalOpen(true);
+                } else {
+                  handleStartOrder();
+                }
+              }}
+              disabled={currentMaxStock <= 0 || quantity < minAllowedQty}
+              className="w-full h-11 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm shadow-amber-500/20 disabled:from-neutral-300 disabled:to-neutral-300 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 disabled:text-slate-500 disabled:cursor-not-allowed"
+            >
+              <Zap size={14} className="fill-white" />
+              <span>{selectedMatrixOrders.length > 0 ? `Start Order (${quantity})` : 'Start Order'}</span>
+            </button>
           </div>
         </div>
+
       </main>
     </PhotoProvider>
   );
