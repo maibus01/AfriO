@@ -460,8 +460,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                 </div>
               )}
 
-              {form.productType === "measured" && (
-                <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm sm:col-span-2">
+              <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm sm:col-span-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200 font-bold text-xs">
                       <Scale size={14} className="text-amber-500" /> Custom Unit Selling
@@ -475,7 +474,6 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                     </div>
                   ) : <span className="text-[11px] text-zinc-400 italic px-0.5">No base dynamic metrics active</span>}
                 </div>
-              )}
 
               <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm">
                 <div className="flex items-center justify-between">
