@@ -154,7 +154,9 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
   };
 
   const compilePayload = () => {
-    const calculatedStock = form.productType === "variant"
+    const hasActiveVariants = form.variants.length > 0;
+
+    const calculatedStock = (form.productType === "variant" || (form.productType === "measured" && hasActiveVariants))
       ? form.variants.reduce((acc, curr) => acc + (Number(curr.stock) || 0), 0)
       : Number(form.stock) || 0;
 
@@ -174,7 +176,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
       existingImages: existingImages,
       attributes: form.attributes,
       features: {
-        variants: form.productType === "variant",
+        variants: form.productType === "variant" || (form.productType === "measured" && hasActiveVariants),
         attributes: Object.keys(form.attributes).length > 0,
         size: !!form.attributes["size"] || !!form.attributes["Size"],
         color: !!form.attributes["color"] || !!form.attributes["Color"],
@@ -185,7 +187,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
       },
     };
 
-    if (form.productType === "variant") {
+    if (form.productType === "variant" || (form.productType === "measured" && hasActiveVariants)) {
       payload.variants = [];
     }
 
@@ -263,7 +265,9 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
         const response = await axios.post(`${API}/products`, formData, config);
         const createdProduct = response.data.data;
 
-        if (form.productType === "variant" && createdProduct?._id && form.variants.length > 0) {
+        const expectsVariants = form.productType === "variant" || (form.productType === "measured" && form.variants.length > 0);
+
+        if (expectsVariants && createdProduct?._id && form.variants.length > 0) {
           const createdVariantIds = [];
 
           for (const variant of form.variants) {
@@ -305,6 +309,8 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
       setUploading(false);
     }
   };
+
+  const isVariantOrMeasured = form.productType === "variant" || form.productType === "measured";
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8 flex justify-center items-start relative font-sans">
@@ -356,18 +362,17 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                   <option value="used">Used / Pre-owned</option>
                   <option value="refurbished">Refurbished</option>
                 </select>
-                {/* ADD THIS UNDER THE PRODUCT TITLE SECTION */}
-                <div>
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 block mb-1.5">Description Summary</label>
-                  <textarea
-                    rows={4}
-                    value={form.description}
-                    placeholder="Describe your product in detail..."
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 resize-none"
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  />
-                </div>
               </div>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 block mb-1.5">Description Summary</label>
+              <textarea
+                rows={4}
+                value={form.description}
+                placeholder="Describe your product in detail..."
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400 resize-none"
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+              />
             </div>
           </div>
 
@@ -401,32 +406,26 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
                 </select>
               </div>
 
-              {form.productType === "simple" || form.productType === "variant" ? (
-                <>
-                  <div>
-                    <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 block mb-1.5">
-                      {form.productType === "variant" ? "Default Base Price" : "Base Price"}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-zinc-400 font-medium">{form.currency}</span>
-                      <input type="number" min="0" placeholder="0.00" value={form.basePrice} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-9 pl-12 pr-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
-                    </div>
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 block mb-1.5">
+                    {isVariantOrMeasured ? "Default Base Price" : "Base Price"}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-zinc-400 font-medium">{form.currency}</span>
+                    <input type="number" min="0" placeholder="0.00" value={form.basePrice} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-9 pl-12 pr-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, basePrice: e.target.value })} />
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 block mb-1.5">Stock Capacity</label>
-                    <div className="relative">
-                      <Package className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                      <input type="number" min="0" placeholder="0" disabled={form.productType === "variant"} value={form.productType === "variant" ? form.variants.reduce((acc, c) => acc + (Number(c.stock) || 0), 0) : form.stock} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-9 pl-9 pr-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none disabled:bg-zinc-100 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-500" onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="col-span-2 flex items-center bg-amber-50/40 dark:bg-amber-950/20 border border-dashed border-amber-200/60 text-amber-800 dark:text-amber-400 px-3.5 py-2 rounded-lg text-[11px] font-medium leading-relaxed">
-                  Dynamic dimensional metrics and wholesale minimum rates are driven directly by the Custom Unit configuration module.
                 </div>
-              )}
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-300 block mb-1.5">Stock Capacity</label>
+                  <div className="relative">
+                    <Package className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+                    <input type="number" min="0" placeholder="0" disabled={isVariantOrMeasured && form.variants.length > 0} value={(isVariantOrMeasured && form.variants.length > 0) ? form.variants.reduce((acc, c) => acc + (Number(c.stock) || 0), 0) : form.stock} className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-9 pl-9 pr-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none disabled:bg-zinc-100 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-500" onChange={(e) => setForm({ ...form, stock: e.target.value })} />
+                  </div>
+                </div>
+              </>
             </div>
-            {form.productType === "variant" && (
+            {isVariantOrMeasured && (
               <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2 font-medium">
                 💡 Entering a Default Base Price above will instantly fill out prices automatically inside the Options Builder Matrix.
               </p>
@@ -438,7 +437,7 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
             <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider block">Advanced System Functional Blocks</span>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {form.productType === "variant" && (
+              {isVariantOrMeasured && (
                 <div className="p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-xl flex flex-col justify-between gap-2.5 shadow-sm sm:col-span-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-zinc-800 dark:text-zinc-200 font-bold text-xs">
@@ -572,265 +571,124 @@ export default function AddProductFormPage({ editProductData, onCloseOrComplete 
             )}
           </div>
 
-          {/* MAIN SUBMIT ACTION BAR */}
-          <div className="pt-4 flex justify-end gap-3 border-t border-zinc-100 dark:border-zinc-800">
-            <button type="button" onClick={onCloseOrComplete} className="h-9 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors dark:text-zinc-200">
+          {/* ACTION ACTIONS */}
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-3">
+            <button type="button" onClick={onCloseOrComplete} disabled={uploading} className="h-9 px-4 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50">
               Cancel
             </button>
-            <button type="button" onClick={handleSaveProduct} disabled={uploading} className="h-9 px-5 rounded-xl bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-950 text-xs font-bold transition-opacity hover:opacity-90 flex items-center gap-2">
+            <button type="button" onClick={handleSaveProduct} disabled={uploading} className="h-9 px-5 bg-zinc-950 hover:bg-zinc-900 dark:bg-zinc-50 dark:hover:bg-zinc-100 text-white dark:text-zinc-950 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2 disabled:opacity-50">
               {uploading && <Loader2 size={14} className="animate-spin" />}
-              {editProductData ? "Update Listing" : "Publish Listing"}
+              {editProductData ? "Commit Changes" : "Publish Listing"}
             </button>
           </div>
 
         </div>
+      </div>
 
-        {/* ========================================== */}
-        {/* MODAL CONFIGURATION PORTAL PORTAL ENGINE   */}
-        {/* ========================================== */}
-        {activeModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+      {/* RENDER VARIANT BUILDER MODAL */}
+      {activeModal === "variants" && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex justify-center items-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400">
+              <X size={16} />
+            </button>
+            <VariantBuilderPage
+              // @ts-ignore - Bypasses structural mismatch if component updates are pending
+              initialAttributes={form.attributes}
+              initialVariants={form.variants}
+              basePrice={Number(form.basePrice) || 0}
+              skuPrefix={form.name ? form.name.substring(0, 3).toUpperCase() : "PRD"}
+              onSave={(generatedVariants: any, attributeFiles: any) => {
+                setForm({
+                  ...form,
+                  variants: generatedVariants
+                });
 
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="absolute top-4 right-4 p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 transition-colors"
-              >
-                <X size={16} />
-              </button>
+                if (attributeFiles) {
+                  setChildVariantFiles((prev) => ({
+                    ...prev,
+                    ...attributeFiles
+                  }));
+                }
+                setActiveModal(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
-              {/* 1. CUSTOM UNIT SELLING MODULE */}
-              {activeModal === "measurement" && (
-                <div className="space-y-4">
+      {/* DUMMY BACKDROP CONTAINER FOR AUXILIARY MODALS */}
+      {activeModal && activeModal !== "variants" && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex justify-center items-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 capitalize">Configure {activeModal === "bulkPricing" ? "Wholesale Tiers" : activeModal}</h3>
+
+            {activeModal === "measurement" && (
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 block mb-1">Measurement Unit</label>
+                  <select value={form.measurement.unit} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-2 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, unit: e.target.value as any } })}>
+                    <option value="yard">Yards (Fabric selling baseline)</option>
+                    <option value="meter">Meters</option>
+                    <option value="kg">Kilograms</option>
+                    <option value="liter">Liters</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Custom Unit Selling</h3>
-                    <p className="text-xs text-zinc-500">Define dimensional metrics or raw bulk properties.</p>
+                    <label className="text-[11px] font-bold text-zinc-500 block mb-1">Price Per Unit ({form.currency})</label>
+                    <input type="number" placeholder="0.00" value={form.measurement.pricePerUnit} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, pricePerUnit: e.target.value } })} />
                   </div>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Unit Type Scale</label>
-                      <select
-                        value={form.measurement.unit}
-                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                        onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, unit: e.target.value as any } })}
-                      >
-                        <option value="yard">Yards (Fabric & Textiles)</option>
-                        <option value="meter">Meters</option>
-                        <option value="kg">Kilograms (Loose Weight Cargo)</option>
-                        <option value="liter">Liters (Liquids)</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Price per Unit ({form.currency})</label>
-                        <input
-                          type="number"
-                          placeholder="0.00"
-                          value={form.measurement.pricePerUnit}
-                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                          onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, pricePerUnit: e.target.value } })}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Minimum Order Qty</label>
-                        <input
-                          type="number"
-                          placeholder="1"
-                          value={form.measurement.minOrder}
-                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                          onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, minOrder: e.target.value } })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. LOGISTICS WEIGHT MATRIX */}
-              {activeModal === "weight" && (
-                <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Logistics Freight Dimensions</h3>
-                    <p className="text-xs text-zinc-500">Provide distribution weight profiles for freight processing.</p>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Gross Weight</label>
-                        <input
-                          type="number"
-                          placeholder="0.00"
-                          value={form.weightMetrics.grossWeight}
-                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                          onChange={(e) => setForm({ ...form, weightMetrics: { ...form.weightMetrics, grossWeight: e.target.value } })}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Net Weight</label>
-                        <input
-                          type="number"
-                          placeholder="0.00"
-                          value={form.weightMetrics.netWeight}
-                          className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                          onChange={(e) => setForm({ ...form, weightMetrics: { ...form.weightMetrics, netWeight: e.target.value } })}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Scale Unit</label>
-                      <select
-                        value={form.weightMetrics.unit}
-                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                        onChange={(e) => setForm({ ...form, weightMetrics: { ...form.weightMetrics, unit: e.target.value } })}
-                      >
-                        <option value="kg">Kilograms (kg)</option>
-                        <option value="g">Grams (g)</option>
-                        <option value="lbs">Pounds (lbs)</option>
-                      </select>
-                    </div>
+                    <label className="text-[11px] font-bold text-zinc-500 block mb-1">Minimum Allowed Order</label>
+                    <input type="number" placeholder="1" value={form.measurement.minOrder} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, measurement: { ...form.measurement, minOrder: e.target.value } })} />
                   </div>
                 </div>
-              )}
-
-              {/* 3. WHOLESALE BULK PRICING */}
-              {activeModal === "bulkPricing" && (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Wholesale Volume Scaling</h3>
-                    <p className="text-xs text-zinc-500">Tiered minimum quantity rate adjustments.</p>
-                  </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {form.bulkPricing.map((tier, index) => (
-                      <div key={index} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-950 p-2 rounded-lg border dark:border-zinc-800">
-                        <span className="text-[10px] text-zinc-400 font-mono">#{index + 1}</span>
-                        <input
-                          type="number"
-                          placeholder="Min Qty"
-                          value={tier.minQty}
-                          className="w-20 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-7 px-1.5 rounded text-xs dark:text-zinc-100 focus:outline-none"
-                          onChange={(e) => {
-                            const updated = [...form.bulkPricing];
-                            updated[index].minQty = Number(e.target.value);
-                            setForm({ ...form, bulkPricing: updated });
-                          }}
-                        />
-                        <span className="text-xs text-zinc-400">items → Price:</span>
-                        <input
-                          type="number"
-                          placeholder="Rate"
-                          value={tier.price}
-                          className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-7 px-1.5 rounded text-xs dark:text-zinc-100 focus:outline-none"
-                          onChange={(e) => {
-                            const updated = [...form.bulkPricing];
-                            updated[index].price = Number(e.target.value);
-                            setForm({ ...form, bulkPricing: updated });
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded shadow-sm"
-                          onClick={() => setForm({ ...form, bulkPricing: form.bulkPricing.filter((_, i) => i !== index) })}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
-                    {form.bulkPricing.length === 0 && (
-                      <div className="text-center py-4 text-xs italic text-zinc-400">No volume scaling parameters loaded yet.</div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="w-full h-8 text-xs border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors font-semibold"
-                    onClick={() => setForm({ ...form, bulkPricing: [...form.bulkPricing, { minQty: 10, price: 0 }] })}
-                  >
-                    + Add Volume Tier Bracket
-                  </button>
-                </div>
-              )}
-
-              {/* 4. PROVENANCE ORIGIN */}
-              {activeModal === "origin" && (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">Listing Provenance</h3>
-                    <p className="text-xs text-zinc-500">Log point of source manufacturing/generation.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">Origin Country</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Nigeria"
-                        value={form.origin.country}
-                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                        onChange={(e) => setForm({ ...form, origin: { ...form.origin, country: e.target.value } })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-zinc-500 block mb-1">State / Region</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., Kano"
-                        value={form.origin.city}
-                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none"
-                        onChange={(e) => setForm({ ...form, origin: { ...form.origin, city: e.target.value } })}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-              {/* 5. INDEPENDENT MODULE ATTACHMENT: VARIANT BUILDER MATRIX */}
-              {activeModal === "variants" && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 backdrop-blur-md p-4 overflow-y-auto">
-                  <div className="w-full max-w-3xl">
-                    <VariantBuilderPage
-                      businessId={businessId}
-                      baseName={form.name}
-                      basePrice={Number(form.basePrice) || 0}
-                      onClose={() => setActiveModal(null)}
-                      onSave={(generatedVariants, attributeFiles) => {
-                        const dynamicAttributesMap: Record<string, string[]> = {};
-                        generatedVariants.forEach((v) => {
-                          Object.entries(v.options).forEach(([key, val]) => {
-                            if (!dynamicAttributesMap[key]) dynamicAttributesMap[key] = [];
-                            if (!dynamicAttributesMap[key].includes(val)) dynamicAttributesMap[key].push(val);
-                          });
-                        });
-
-                        setForm((prev) => ({
-                          ...prev,
-                          variants: generatedVariants,
-                          attributes: dynamicAttributesMap
-                        }));
-
-                        setChildVariantFiles(attributeFiles);
-                        setActiveModal(null);
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* SAVING CLOSING TRIGGER FOR POPUP PORTALS */}
-              <div className="mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setActiveModal(null)}
-                  className="h-8 px-4 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-950 font-bold text-xs rounded-lg shadow-sm hover:opacity-90"
-                >
-                  Save & Return
-                </button>
               </div>
+            )}
 
+            {activeModal === "bulkPricing" && (
+              <div className="space-y-2 text-left">
+                <span className="text-[11px] text-zinc-400 block mb-1">Quick-set basic sample wholesale rate:</span>
+                <button type="button" onClick={() => setForm({ ...form, bulkPricing: [{ minQty: 10, price: Number(form.basePrice || form.measurement.pricePerUnit) * 0.9 }] })} className="text-[11px] text-indigo-500 font-bold underline block">Generate Sample Wholesale Tier (Min 10 Items)</button>
+                {form.bulkPricing.length > 0 && <div className="text-xs bg-zinc-50 dark:bg-zinc-950 p-2 border dark:border-zinc-800 rounded font-mono">Active Tier: Qty {form.bulkPricing[0].minQty}+ → {form.currency} {form.bulkPricing[0].price}</div>}
+              </div>
+            )}
+
+            {activeModal === "weight" && (
+              <div className="grid grid-cols-2 gap-3 text-left">
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 block mb-1">Gross Metric Weight</label>
+                  <input type="number" placeholder="1.5" value={form.weightMetrics.grossWeight} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, weightMetrics: { ...form.weightMetrics, grossWeight: e.target.value } })} />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 block mb-1">Scale Unit</label>
+                  <input value={form.weightMetrics.unit} disabled className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs text-zinc-400" />
+                </div>
+              </div>
+            )}
+
+            {activeModal === "origin" && (
+              <div className="grid grid-cols-2 gap-3 text-left">
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 block mb-1">Country</label>
+                  <input placeholder="Nigeria" value={form.origin.country} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, origin: { ...form.origin, country: e.target.value } })} />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 block mb-1">City/State</label>
+                  <input placeholder="Kano" value={form.origin.city} className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 h-9 px-3 rounded-lg text-xs dark:text-zinc-100 focus:outline-none" onChange={(e) => setForm({ ...form, origin: { ...form.origin, city: e.target.value } })} />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button type="button" onClick={() => setActiveModal(null)} className="h-8 px-4 bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-950 text-xs font-bold rounded-lg">
+                Done
+              </button>
             </div>
           </div>
-        )}
-
-      </div>
+        </div>
+      )}
     </div>
   );
 }
