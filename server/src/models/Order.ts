@@ -4,6 +4,13 @@ export interface IOrder extends Document {
   refNumber: string;
 
   productId: mongoose.Types.ObjectId;
+  variantId?: mongoose.Types.ObjectId;   // 👈 ADD THIS
+
+  sku?: string;                          // 👈 ADD THIS
+  unitPrice?: number;     
+
+
+
   businessId: mongoose.Types.ObjectId;
   ownerId: mongoose.Types.ObjectId;
 
@@ -54,6 +61,15 @@ const OrderSchema = new Schema<IOrder>(
       ref: "Product",
       required: true,
     },
+
+    variantId: {
+  type: Schema.Types.ObjectId,
+  ref: "Variant",
+},
+
+sku: String,
+
+unitPrice: Number,
 
     businessId: {
       type: Schema.Types.ObjectId,

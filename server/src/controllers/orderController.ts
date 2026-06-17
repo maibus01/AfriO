@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { Order } from "../models/Order";
 import { PlatformAccount } from "../models/PlatformAccount";
 import { Business } from "../models/Business";
+import { Product } from "../models/Product";
+import { Variant } from "../models/Variant";
 
 // ==============================
 // HELPER → GET SELLER BUSINESSES
@@ -14,17 +16,20 @@ const getUserBusinessIds = async (userId: string) => {
 // ==============================
 // CREATE ORDER (CUSTOMER)
 // ==============================
-export const createOrder = async (req: Request, res: Response) => {
+export const createOrder = async (req: any, res: Response) => {
   try {
     const {
       productId,
       businessId,
       quantity,
       notes,
-      totalPrice,
       platformAccountId,
+      variantId, // 👈 MAIN INPUT
     } = req.body;
 
+    // =========================
+    // VALIDATE PAYMENT ACCOUNT
+    // =========================
     const account = await PlatformAccount.findById(platformAccountId);
 
     if (!account || !account.isActive) {
@@ -33,27 +38,86 @@ export const createOrder = async (req: Request, res: Response) => {
       });
     }
 
+    // =========================
+    // VALIDATE PRODUCT
+    // =========================
+    const product = await Product.findById(productId);
+
+    if (!product || !product.isActive) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
+
+    let unitPrice = product.basePrice || 0;
+    let variant = null;
+
+    // =========================
+    // VARIANT MODE (YOUR REQUIREMENT)
+    // =========================
+    if (variantId) {
+      variant = await Variant.findById(variantId);
+
+      if (!variant || !variant.isActive) {
+        return res.status(404).json({
+          message: "Variant not found",
+        });
+      }
+
+      if (variant.stock < quantity) {
+        return res.status(400).json({
+          message: "Insufficient stock",
+        });
+      }
+
+      unitPrice = variant.price;
+    }
+
+    const totalPrice = unitPrice * quantity;
+
+    // =========================
+    // CREATE ORDER (NOW WITH FULL VARIANT DATA)
+    // =========================
     const order = await Order.create({
       productId,
       businessId,
       ownerId: req.user.id,
+
       quantity,
       notes,
+
       totalPrice,
       platformAccountId,
 
-      // ✅ IMPORTANT
+      // 🔥 VARIANT SNAPSHOT (WHAT YOU WANTED)
+      variantId: variant?._id,
+      sku: variant?.sku,
+      unitPrice: unitPrice,
+
       customerStatus: "pending_payment",
       internalStatus: "pending_payment",
     });
 
-    res.status(201).json({
+    // =========================
+    // STOCK REDUCTION
+    // =========================
+    if (variant) {
+      await Variant.findByIdAndUpdate(variant._id, {
+        $inc: { stock: -quantity },
+      });
+    } else {
+      await Product.findByIdAndUpdate(productId, {
+        $inc: { stock: -quantity },
+      });
+    }
+
+    return res.status(201).json({
       success: true,
       order,
     });
   } catch (err: any) {
     console.error("CREATE ORDER ERROR:", err);
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 };
 

@@ -23,38 +23,38 @@ const OrderPage = () => {
   const [processingOrder, setProcessingOrder] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Destructure incoming dynamic state
-  const { product, quantity, notes, calculatedPrice } = location.state || {};
+  // =========================================================================
+  // EXTRACT VARIANT DATA FROM ROUTING STATE
+  // =========================================================================
+  // Destructure product along with variantId, sku, and option traits passed from the selector
+  const { product, variantId, sku, variantOptions, quantity, notes, calculatedPrice } = location.state || {};
   
-  // FIX: Uses calculated dynamic wholesale tiers passed down from the product page state
   const totalPrice = calculatedPrice || (product ? (product.measurement?.pricePerUnit || product.basePrice) * quantity : 0);
 
-  // =========================
   // 1. FETCH ACCOUNTS ON LOAD
-  // =========================
   useEffect(() => {
     const fetchAccounts = async () => {
-      try {
-        const res = await API.get("/accounts");
-        const accountData = res.data.accounts || [];
-        setAccounts(accountData);
+  try {
+    const res = await API.get("/accounts");
+    const accountData = res.data.accounts || [];
+    setAccounts(accountData);
 
-        if (accountData.length > 0) {
-          setSelectedAccount(accountData[0]);
-        }
-      } catch (err) {
-        console.error("Failed to load payment accounts");
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (accountData.length > 0) {
+      setSelectedAccount(accountData[0]);
+    }
+  } catch (err) {
+    console.error("Failed to load payment accounts");
+  } finally {
+    setLoading(false); // ✅ Fixed: Calling the setter function instead
+  }
+};
 
     if (product) fetchAccounts();
   }, [product]);
 
-  // =========================
-  // 2. CREATE ORDER + WHATSAPP
-  // =========================
+  // =========================================================================
+  // 2. CREATE ORDER (WITH VARIANT SAVE LOGIC) + WHATSAPP HANDOFF
+  // =========================================================================
   const handleCompleteOrder = async () => {
     if (!selectedAccount) {
       alert("Please select a payment account");
@@ -64,8 +64,12 @@ const OrderPage = () => {
     try {
       setProcessingOrder(true);
 
+      // Matches your new backend document mapping schema
       const res = await API.post("/orders", {
         productId: product._id,
+        variantId: variantId || null, // 👈 Added: Link specific variant
+        sku: sku || "",               // 👈 Added: Snapshot of product SKU identity
+        unitPrice: totalPrice / quantity, // 👈 Added: Base unit cost representation
         businessId: product.businessId?._id || product.businessId,
         quantity,
         notes,
@@ -75,7 +79,12 @@ const OrderPage = () => {
 
       const refNumber = res.data.order.refNumber || res.data.order._id.slice(-6).toUpperCase();
 
-      const rawMessage = `💎 *%F0%9F%92%8E AFRIO ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product:* ${product.name}\n*Quantity:* ${quantity}\n*Total Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment To:* ${selectedAccount.bankName}\nNote: I have made the transfer. Please verify.`;
+      // Format clean variant specifications out into the WhatsApp message string if they exist
+      const variantSpecText = variantOptions 
+        ? Object.entries(variantOptions).map(([key, val]) => `\n*${key}:* ${val}`).join("")
+        : "";
+
+      const rawMessage = `💎 *%F0%9F%92%8E AFRIO ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product:* ${product.name}${variantSpecText}\n*SKU:* ${sku || "N/A"}\n*Quantity:* ${quantity}\n*Total Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment To:* ${selectedAccount.bankName}\nNote: I have made the transfer. Please verify.`;
 
       const message = encodeURIComponent(rawMessage);
       const phone = "2349027456061";
@@ -135,12 +144,30 @@ const OrderPage = () => {
         {/* ORDER OVERVIEW CARD */}
         <div className="bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-neutral-100 dark:border-neutral-800/60 shadow-xs">
           <div className="flex justify-between items-start gap-4">
-            <div>
-              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">
+            <div className="space-y-1.5 flex-1">
+              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">
                 Items Package
               </p>
               <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-sm line-clamp-2">{product.name}</h3>
-              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 font-medium">Quantity units: {quantity}</p>
+              
+              {/* ========================================================================= */}
+              {/* RENDER DYNAMIC VARIANT BADGES IF ACTIVE */}
+              {/* ========================================================================= */}
+              {variantOptions && (
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {Object.entries(variantOptions).map(([key, value]: any) => (
+                    <span key={key} className="text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 px-2 py-0.5 rounded-md uppercase tracking-wide">
+                      {key}: {value}
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {sku && (
+                <p className="text-[10px] text-slate-400 font-mono tracking-tight">SKU: {sku}</p>
+              )}
+
+              <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium pt-1">Quantity units: {quantity}</p>
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">
