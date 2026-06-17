@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { X, Plus, Minus } from "lucide-react";
+import { X, Plus, Minus, Maximize2 } from "lucide-react";
 
 interface Variant {
   _id: string;
@@ -7,7 +7,7 @@ interface Variant {
   stock?: number;
   price?: number;
   images?: string[];
-  options?: Record<string, string>; // Dynamically handles: { Color: "Green", Storage: "128GB", Model: "iPhone 11" } or { Color: "Black" }
+  options?: Record<string, string>;
 }
 
 interface Measurement {
@@ -57,7 +57,6 @@ export default function VariantSelector({
       }
     });
 
-    // Enforce that 'Color' always remains the top-level layer if present
     const sortedKeys = [...keysOrder].sort((a, b) => {
       if (a.toLowerCase() === "color") return -1;
       if (b.toLowerCase() === "color") return 1;
@@ -71,12 +70,22 @@ export default function VariantSelector({
   }, [variants]);
 
   const totalLayers = attributeLayers.length;
-  const leafLayerName = totalLayers > 0 ? attributeLayers[totalLayers - 1].name : "";
-  const selectionLayers = useMemo(() => attributeLayers.slice(0, -1), [attributeLayers]);
+  const hasOnlyColor = totalLayers === 1 && attributeLayers[0].name.toLowerCase() === "color";
+
+  const selectionLayers = useMemo(() => {
+    if (hasOnlyColor) return attributeLayers; 
+    return attributeLayers.slice(0, -1);
+  }, [attributeLayers, hasOnlyColor]);
+
+  const leafLayerName = useMemo(() => {
+    if (hasOnlyColor) return "Options"; 
+    return totalLayers > 0 ? attributeLayers[totalLayers - 1].name : "";
+  }, [attributeLayers, totalLayers, hasOnlyColor]);
 
   // 2. CONTROLLER STATES
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   useEffect(() => {
     const initial: Record<string, string> = {};
@@ -92,11 +101,13 @@ export default function VariantSelector({
   const currentBottomRows = useMemo(() => {
     return variants.filter((v) => {
       if (!v.options) return false;
+      if (hasOnlyColor) {
+        return v.options["Color"] === selections["Color"];
+      }
       return selectionLayers.every((layer) => v.options?.[layer.name] === selections[layer.name]);
     });
-  }, [variants, selectionLayers, selections]);
+  }, [variants, selectionLayers, selections, hasOnlyColor]);
 
-  // Helper routine to fetch thumbnail for any color match across variants
   const getColorThumbnail = (colorValue: string): string => {
     const matchedVar = variants.find(
       (v) => v.options?.Color === colorValue && v.images && v.images.length > 0
@@ -195,7 +206,7 @@ export default function VariantSelector({
 
   return (
     <>
-      {/* TRIGGER TRIGGER ROW ROW CONTAINER */}
+      {/* TRIGGER ROW CONTAINER */}
       <div
         onClick={() => setIsOpen(true)}
         className="bg-white dark:bg-neutral-900 p-4 md:rounded-2xl shadow-xs border-y md:border border-slate-200/40 dark:border-neutral-800/60 flex items-center justify-between cursor-pointer active:bg-slate-50 select-none"
@@ -240,8 +251,14 @@ export default function VariantSelector({
               
               {/* IMAGE DETAILS PREVIEW BOX */}
               <div className="flex gap-4 items-start">
-                <div className="w-20 h-20 bg-slate-50 dark:bg-neutral-950 rounded-xl overflow-hidden border border-slate-200/60 dark:border-neutral-800 flex-shrink-0">
-                  <img src={currentDisplayImage} className="w-full h-full object-contain" alt="" />
+                <div 
+                  onClick={() => setLightboxImage(currentDisplayImage)}
+                  className="group relative w-20 h-20 bg-slate-50 dark:bg-neutral-950 rounded-xl overflow-hidden border border-slate-200/60 dark:border-neutral-800 flex-shrink-0 cursor-zoom-in"
+                >
+                  <img src={currentDisplayImage} className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105" alt="Selected Preview" />
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                    <Maximize2 size={14} />
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 flex-1">
@@ -249,7 +266,8 @@ export default function VariantSelector({
                     <div className="text-base font-black text-orange-600 dark:text-orange-500">
                       {currencySymbol}{(measurement?.pricePerUnit || basePrice).toLocaleString()}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-medium">Min. order: {measurement?.minOrder || 2} units</div>
+                    {/* CHANGED: Falls back to 1 unit default text instead of 2 */}
+                    <div className="text-[10px] text-slate-400 font-medium">Min. order: {measurement?.minOrder || 1} units</div>
                   </div>
                   <div>
                     <div className="text-base font-black text-slate-800 dark:text-white">
@@ -260,7 +278,7 @@ export default function VariantSelector({
                 </div>
               </div>
 
-              {/* AUTOMATED SELECTION LAYERS (Only shows if multiple levels exist e.g. Color + Storage) */}
+              {/* AUTOMATED SELECTION LAYERS */}
               {selectionLayers.map((layer) => {
                 const isColorLayer = layer.name.toLowerCase() === "color";
 
@@ -313,29 +331,33 @@ export default function VariantSelector({
               {leafLayerName && (
                 <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-neutral-800">
                   <span className="block text-xs font-bold text-slate-800 dark:text-neutral-200 tracking-wider uppercase">
-                    Available {leafLayerName}
+                    Available {hasOnlyColor ? "Selection" : leafLayerName}
                   </span>
 
                   <div className="space-y-3">
                     {currentBottomRows.map((v) => {
-                      const leafLabel = v.options?.[leafLayerName] || v.sku || "Standard Option";
+                      const leafLabel = hasOnlyColor 
+                        ? (v.sku || `Standard Pack`) 
+                        : (v.options?.[leafLayerName] || v.sku || "Standard Option");
                       const stock = v.stock ?? 0;
                       
                       const compositeKey = getCompositeKey(v);
                       const currentQty = quantities[compositeKey] || 0;
-                      
-                      // Check if this row represents a Color directly (meaning there are no sub-layers)
-                      const isColorRow = leafLayerName.toLowerCase() === "color";
+
+                      const rowImage = v.images?.[0] || (v.options?.Color ? getColorThumbnail(v.options.Color) : defaultImage);
 
                       return (
                         <div key={v._id} className="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-neutral-950/30 rounded-xl border border-slate-100 dark:border-neutral-800/50">
                           <div className="flex items-center gap-3">
-                            {/* Every color option row automatically gets its thumbnail image */}
-                            {isColorRow && (
-                              <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200/60 dark:border-neutral-800 flex-shrink-0">
-                                <img src={getColorThumbnail(leafLabel)} className="w-full h-full object-cover" alt="" />
+                            <div 
+                              onClick={() => setLightboxImage(rowImage)}
+                              className="group relative w-10 h-10 rounded-lg overflow-hidden bg-white border border-slate-200/60 dark:border-neutral-800 flex-shrink-0 cursor-zoom-in"
+                            >
+                              <img src={rowImage} className="w-full h-full object-contain transition-transform duration-150 group-hover:scale-105" alt="" />
+                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[8px]">
+                                <Maximize2 size={10} />
                               </div>
-                            )}
+                            </div>
                             <div className="space-y-0.5">
                               <span className="text-xs font-black text-slate-800 dark:text-white uppercase">{leafLabel}</span>
                               <span className="block text-[10px] text-slate-400">Inventory: {stock} units</span>
@@ -378,6 +400,7 @@ export default function VariantSelector({
             </div>
 
             {/* FIXED FOOTER CONTROLLER BAR */}
+            {/* CHANGED: Button disable condition and validation error message both point to 1 as fallback default */}
             <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-neutral-900 border-t border-slate-100 dark:border-neutral-800 p-4 space-y-3 z-20 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] flex-shrink-0">
               <div className="flex justify-between items-baseline">
                 <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">Subtotal</span>
@@ -395,11 +418,35 @@ export default function VariantSelector({
                 className="w-full h-12 rounded-full font-bold text-sm bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md active:scale-98 transition-all disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 disabled:text-slate-400 disabled:cursor-not-allowed"
               >
                 {totalQuantity < (measurement?.minOrder || 1) 
-                  ? `Minimum requirement is ${measurement?.minOrder || 2} units` 
+                  ? `Minimum requirement is ${measurement?.minOrder || 1} units` 
                   : "Start Order"}
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* FULL SCREEN LIGHTBOX MODAL */}
+      {lightboxImage && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/90 p-4 animate-fade-in select-none">
+          <button 
+            onClick={() => setLightboxImage(null)}
+            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
+          
+          <div 
+            className="max-w-3xl max-h-[85vh] w-full h-full flex items-center justify-center p-2"
+            onClick={() => setLightboxImage(null)}
+          >
+            <img 
+              src={lightboxImage} 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl scale-up-anim" 
+              alt="Expanded Preview"
+              onClick={(e) => e.stopPropagation()} 
+            />
           </div>
         </div>
       )}
@@ -412,6 +459,11 @@ export default function VariantSelector({
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-scale-in { transform: scale(0); animation: scaleIn 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
         @keyframes scaleIn { to { transform: scale(1); } }
+        
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        .scale-up-anim { animation: centerPopup 0.25s cubic-bezier(0.34, 1.3, 0.64, 1) forwards; }
+        .z-55 { z-index: 55; }
+        .cursor-zoom-in { cursor: zoom-in; }
       `}</style>
     </>
   );

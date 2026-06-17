@@ -413,20 +413,20 @@ export default function ProductDetails() {
 
         {/* BOTTOM FIXED APP ACTION BAR */}
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 px-4 py-3 z-30 flex items-center justify-between gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-          <button className="flex flex-col items-center justify-center text-slate-600 dark:text-neutral-400 active:scale-95 transition-transform px-2">
+          {/* <button className="flex flex-col items-center justify-center text-slate-600 dark:text-neutral-400 active:scale-95 transition-transform px-2">
             <MessageSquare size={20} className="text-slate-700 dark:text-neutral-300" />
             <span className="text-[10px] mt-0.5 font-medium whitespace-nowrap">Chat Now</span>
-          </button>
+          </button> */}
 
           <div className="flex-1 grid grid-cols-2 gap-2">
-            <button
+            {/* <button
               disabled={currentMaxStock <= 0}
               onClick={() => setIsVariantModalOpen(true)}
               className="w-full h-11 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 border border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-50/30 dark:bg-transparent disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ShoppingCart size={14} />
               <span>Add to Cart</span>
-            </button>
+            </button> */}
 
             <button
               onClick={() => {

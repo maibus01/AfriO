@@ -1,4 +1,11 @@
-import mongoose, { Schema, Document, Model, CallbackWithoutResultAndOptionalError } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
+
+export interface IOrderItem {
+  variantId: mongoose.Types.ObjectId;
+  sku?: string;
+  quantity: number;
+  options?: Record<string, string>;
+}
 
 export interface IOrder extends Document {
   refNumber: string;
@@ -10,6 +17,8 @@ export interface IOrder extends Document {
   platformAccountId: mongoose.Types.ObjectId;
 
   quantity: number;
+  items: IOrderItem[];
+
   notes?: string;
   totalPrice: number;
 
@@ -18,7 +27,6 @@ export interface IOrder extends Document {
 
   paymentMethod: "bank_transfer";
 
-  // CUSTOMER VIEW
   customerStatus:
     | "pending_payment"
     | "processing"
@@ -26,7 +34,6 @@ export interface IOrder extends Document {
     | "completed"
     | "cancelled";
 
-  // INTERNAL
   internalStatus:
     | "pending_payment"
     | "payment_received"
@@ -42,12 +49,39 @@ export interface IOrder extends Document {
   updatedAt?: Date;
 }
 
+const OrderItemSchema = new Schema(
+  {
+    variantId: {
+      type: Schema.Types.ObjectId,
+      required: true,
+    },
+
+    sku: {
+      type: String,
+      default: "",
+    },
+
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
+    options: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 const OrderSchema = new Schema<IOrder>(
   {
-   refNumber: {
-  type: String,
-
-},
+    refNumber: {
+      type: String,
+    },
 
     productId: {
       type: Schema.Types.ObjectId,
@@ -79,6 +113,11 @@ const OrderSchema = new Schema<IOrder>(
       min: 1,
     },
 
+    items: {
+      type: [OrderItemSchema],
+      default: [],
+    },
+
     notes: {
       type: String,
       default: "",
@@ -108,7 +147,13 @@ const OrderSchema = new Schema<IOrder>(
 
     customerStatus: {
       type: String,
-      enum: ["pending_payment", "processing", "delivered", "completed", "cancelled"],
+      enum: [
+        "pending_payment",
+        "processing",
+        "delivered",
+        "completed",
+        "cancelled",
+      ],
       default: "pending_payment",
     },
 
@@ -132,26 +177,29 @@ const OrderSchema = new Schema<IOrder>(
       default: "",
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-//
-// 🔥 GENERATE REF NUMBER
-//
 OrderSchema.pre("save", async function () {
   if (!this.refNumber) {
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const random = Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+
     this.refNumber = `ORD-${random}`;
   }
 });
 
-//
-// ⚡ INDEXES
-//
 OrderSchema.index({ ownerId: 1 });
 OrderSchema.index({ businessId: 1 });
 OrderSchema.index({ internalStatus: 1 });
 OrderSchema.index({ customerStatus: 1 });
 OrderSchema.index({ createdAt: -1 });
 
-export const Order: Model<IOrder> = mongoose.model<IOrder>("Order", OrderSchema);
+export const Order: Model<IOrder> = mongoose.model<IOrder>(
+  "Order",
+  OrderSchema
+);
