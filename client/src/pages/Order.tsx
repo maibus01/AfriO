@@ -12,16 +12,6 @@ import {
 import { useState, useEffect } from "react";
 import API from "../api/User";
 
-// ============================================================================
-// DYNAMIC ENVIRONMENT BASEURL PATCH
-// Preserves Axios instance methods while shifting endpoints dynamically.
-// ============================================================================
-if (typeof window !== "undefined") {
-  API.defaults.baseURL = window.location.hostname === "localhost"
-    ? "http://localhost:5000/api"
-    : "https://afrio-api.onrender.com/api";
-}
-
 const OrderPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -33,26 +23,15 @@ const OrderPage = () => {
   const [processingOrder, setProcessingOrder] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Destructure variation properties passed down from the Selector state
-  const { product, items = [], notes, calculatedPrice, quantity } = location.state || {};
+  // Destructure incoming dynamic state
+  const { product, quantity, notes, calculatedPrice } = location.state || {};
   
+  // FIX: Uses calculated dynamic wholesale tiers passed down from the product page state
   const totalPrice = calculatedPrice || (product ? (product.measurement?.pricePerUnit || product.basePrice) * quantity : 0);
 
-  // ============================================================================
-  // 1. AUTHENTICATION PROTECTION CHECK
-  // ============================================================================
-  useEffect(() => {
-    const token = localStorage.getItem("token"); 
-
-    if (!token) {
-      alert("Please log in to finalize your purchase.");
-      navigate("/auth", { state: { from: location.state } });
-    }
-  }, [navigate, location.state]);
-
-  // ============================================================================
-  // 2. FETCH PAYMENT ROUTING ACCOUNTS
-  // ============================================================================
+  // =========================
+  // 1. FETCH ACCOUNTS ON LOAD
+  // =========================
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
@@ -64,7 +43,7 @@ const OrderPage = () => {
           setSelectedAccount(accountData[0]);
         }
       } catch (err) {
-        console.error("Failed to load payment accounts", err);
+        console.error("Failed to load payment accounts");
       } finally {
         setLoading(false);
       }
@@ -73,9 +52,9 @@ const OrderPage = () => {
     if (product) fetchAccounts();
   }, [product]);
 
-  // ============================================================================
-  // 3. CREATE ORDER & INITIALIZE WHATSAPP HANDOFF
-  // ============================================================================
+  // =========================
+  // 2. CREATE ORDER + WHATSAPP
+  // =========================
   const handleCompleteOrder = async () => {
     if (!selectedAccount) {
       alert("Please select a payment account");
@@ -85,51 +64,26 @@ const OrderPage = () => {
     try {
       setProcessingOrder(true);
 
-      // Maps state variables directly into the document format required by your backend schema
-      const formattedItemsForBackend = items.map((item: any) => ({
-        variantId: item.variant._id,
-        sku: item.variant.sku || "",
-        quantity: item.qty,
-        options: item.variant.options || {}
-      }));
-
       const res = await API.post("/orders", {
         productId: product._id,
         businessId: product.businessId?._id || product.businessId,
-        items: formattedItemsForBackend, 
+        quantity,
         notes,
-        totalPrice, 
+        totalPrice,
         platformAccountId: selectedAccount._id,
       });
 
       const refNumber = res.data.order.refNumber || res.data.order._id.slice(-6).toUpperCase();
 
-      // Formats full structured items breakdown into a readable block list for the WhatsApp text
-      const itemDetailsSummary = items && items.length > 0
-        ? items.map((i: any) => {
-            const optionsStr = Object.entries(i.variant.options || {})
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(", ");
-            return `• ${i.variant.sku || 'Item'} (${optionsStr}) x ${i.qty}`;
-          }).join("\n")
-        : `Quantity: ${quantity}`;
-
-      const rawMessage = `💎 *AFRIO ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product:* ${product.name}\n\n*Selected Variations:*\n${itemDetailsSummary}\n\n*Total Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment To:* ${selectedAccount.bankName}\nNote: I have made the transfer. Please verify.`;
+      const rawMessage = `💎 *%F0%9F%92%8E AFRIO ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product:* ${product.name}\n*Quantity:* ${quantity}\n*Total Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment To:* ${selectedAccount.bankName}\nNote: I have made the transfer. Please verify.`;
 
       const message = encodeURIComponent(rawMessage);
       const phone = "2349027456061";
 
-      // iOS Safari Compatibility Check
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-      
-      if (isIOS) {
-        // Direct assignment to bypass pop-up blockers and trigger deep-linking safely
-        window.location.href = `whatsapp://send?phone=${phone}&text=${message}`;
-      } else {
-        // Universal web application route link for Android / Desktop clients
-        window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${message}`, "_blank");
-      }
-
+      window.open(
+        `https://api.whatsapp.com/send?phone=${phone}&text=${message}`,
+        "_blank"
+      );
     } catch (err: any) {
       console.error("Order Creation Error:", err);
       alert(err.response?.data?.message || "Connection error. Try again.");
@@ -140,8 +94,10 @@ const OrderPage = () => {
 
   const copyToClipboard = () => {
     if (!selectedAccount) return;
+
     navigator.clipboard.writeText(selectedAccount.accountNumber);
     setCopied(true);
+
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -176,51 +132,23 @@ const OrderPage = () => {
       </div>
 
       <div className="max-w-xl mx-auto p-4 space-y-4">
-        
-        {/* FULL MULTI-VARIATION ITEM SUMMARY PREVIEW CARD */}
-        <div className="bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-neutral-100 dark:border-neutral-800/60 shadow-xs space-y-4">
-          <div>
-            <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">
-              Base Product Model
-            </p>
-            <h3 className="font-black text-slate-900 dark:text-white text-base leading-tight">{product.name}</h3>
-          </div>
-
-          <div className="border-t border-neutral-100 dark:border-neutral-800/60 pt-3 space-y-2.5">
-            <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">
-              Selected Item Configuration Breakdown
-            </p>
-            
-            {items.map((item: any, idx: number) => (
-              <div key={idx} className="flex justify-between items-center text-xs bg-neutral-50 dark:bg-neutral-950 p-3 rounded-xl border border-neutral-100 dark:border-neutral-800/40">
-                <div className="space-y-0.5">
-                  <span className="font-black text-slate-800 dark:text-neutral-200 block uppercase">
-                    {item.variant?.sku || `Variant Unit #${idx + 1}`}
-                  </span>
-                  <div className="flex flex-wrap gap-x-2 text-[11px] text-slate-400 font-medium">
-                    {Object.entries(item.variant?.options || {}).map(([key, value]: any) => (
-                      <span key={key}>{key}: <b className="text-slate-600 dark:text-neutral-300 font-semibold">{value}</b></span>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className="text-xs font-black text-slate-700 dark:text-neutral-300 block">× {item.qty}</span>
-                  <span className="text-[10px] text-slate-400 font-semibold">
-                    ₦{(item.variant?.price || product.basePrice || 0).toLocaleString()} each
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-neutral-100 dark:border-neutral-800/60 pt-3 flex justify-between items-end">
+        {/* ORDER OVERVIEW CARD */}
+        <div className="bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-neutral-100 dark:border-neutral-800/60 shadow-xs">
+          <div className="flex justify-between items-start gap-4">
             <div>
-              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Total Bulk Volume</p>
-              <p className="text-xs font-black text-slate-700 dark:text-neutral-300 mt-0.5">{quantity} aggregate units</p>
+              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">
+                Items Package
+              </p>
+              <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-sm line-clamp-2">{product.name}</h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 font-medium">Quantity units: {quantity}</p>
             </div>
-            <div className="text-right">
-              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Summary Cost</p>
-              <p className="text-xl font-black text-amber-500">₦{totalPrice.toLocaleString()}</p>
+            <div className="text-right flex-shrink-0">
+              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">
+                Total aggregate
+              </p>
+              <p className="text-lg font-black text-amber-500">
+                ₦{totalPrice.toLocaleString()}
+              </p>
             </div>
           </div>
         </div>
