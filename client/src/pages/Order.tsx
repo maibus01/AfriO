@@ -26,28 +26,44 @@ const OrderPage = () => {
   // =========================================================================
   // EXTRACT VARIANT DATA FROM ROUTING STATE
   // =========================================================================
-  // Destructure product along with variantId, sku, and option traits passed from the selector
-  const { product, variantId, sku, variantOptions, quantity, notes, calculatedPrice } = location.state || {};
+  // Added: variantPrice and variantImage extracted from the router state snapshot
+  const { 
+    product, 
+    variantId, 
+    sku, 
+    variantOptions, 
+    quantity, 
+    notes, 
+    calculatedPrice,
+    variantPrice, 
+    variantImage 
+  } = location.state || {};
   
   const totalPrice = calculatedPrice || (product ? (product.measurement?.pricePerUnit || product.basePrice) * quantity : 0);
+  
+  // Determine item display price: Variant specific price, fallback to calculated split, fallback to product base
+  const unitPriceDisplay = variantPrice || (calculatedPrice ? calculatedPrice / quantity : (product?.measurement?.pricePerUnit || product?.basePrice || 0));
+  
+  // Determine item thumbnail image: Variant snapshot image, fallback to product main display image
+  const displayImage = variantImage || product?.image || product?.images?.[0] || null;
 
   // 1. FETCH ACCOUNTS ON LOAD
   useEffect(() => {
     const fetchAccounts = async () => {
-  try {
-    const res = await API.get("/accounts");
-    const accountData = res.data.accounts || [];
-    setAccounts(accountData);
+      try {
+        const res = await API.get("/accounts");
+        const accountData = res.data.accounts || [];
+        setAccounts(accountData);
 
-    if (accountData.length > 0) {
-      setSelectedAccount(accountData[0]);
-    }
-  } catch (err) {
-    console.error("Failed to load payment accounts");
-  } finally {
-    setLoading(false); // ✅ Fixed: Calling the setter function instead
-  }
-};
+        if (accountData.length > 0) {
+          setSelectedAccount(accountData[0]);
+        }
+      } catch (err) {
+        console.error("Failed to load payment accounts");
+      } finally {
+        setLoading(false);
+      }
+    };
 
     if (product) fetchAccounts();
   }, [product]);
@@ -64,12 +80,11 @@ const OrderPage = () => {
     try {
       setProcessingOrder(true);
 
-      // Matches your new backend document mapping schema
       const res = await API.post("/orders", {
         productId: product._id,
-        variantId: variantId || null, // 👈 Added: Link specific variant
-        sku: sku || "",               // 👈 Added: Snapshot of product SKU identity
-        unitPrice: totalPrice / quantity, // 👈 Added: Base unit cost representation
+        variantId: variantId || null,
+        sku: sku || "",
+        unitPrice: totalPrice / quantity,
         businessId: product.businessId?._id || product.businessId,
         quantity,
         notes,
@@ -79,7 +94,6 @@ const OrderPage = () => {
 
       const refNumber = res.data.order.refNumber || res.data.order._id.slice(-6).toUpperCase();
 
-      // Format clean variant specifications out into the WhatsApp message string if they exist
       const variantSpecText = variantOptions 
         ? Object.entries(variantOptions).map(([key, val]) => `\n*${key}:* ${val}`).join("")
         : "";
@@ -141,42 +155,65 @@ const OrderPage = () => {
       </div>
 
       <div className="max-w-xl mx-auto p-4 space-y-4">
+        
         {/* ORDER OVERVIEW CARD */}
         <div className="bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-neutral-100 dark:border-neutral-800/60 shadow-xs">
-          <div className="flex justify-between items-start gap-4">
-            <div className="space-y-1.5 flex-1">
-              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">
-                Items Package
-              </p>
-              <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-sm line-clamp-2">{product.name}</h3>
+          <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-3">
+            Items Package
+          </p>
+
+          <div className="flex gap-4 items-start">
+            {/* 📸 SKU PICTURE BLOCK */}
+            {displayImage ? (
+              <img 
+                src={displayImage} 
+                alt={product.name} 
+                className="w-20 h-20 object-cover rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-950 flex-shrink-0"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center text-neutral-400 flex-shrink-0">
+                <ShoppingBag size={20} />
+              </div>
+            )}
+
+            {/* SKU META DETAILS & PRICES BLOCK */}
+            <div className="space-y-1 flex-1 min-w-0">
+              <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-sm line-clamp-2 leading-tight">
+                {product.name}
+              </h3>
               
-              {/* ========================================================================= */}
-              {/* RENDER DYNAMIC VARIANT BADGES IF ACTIVE */}
-              {/* ========================================================================= */}
+              {sku && (
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono bg-neutral-50 dark:bg-neutral-950 px-1.5 py-0.5 rounded border border-neutral-200/20 w-fit">
+                  SKU: {sku}
+                </p>
+              )}
+
               {variantOptions && (
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                <div className="flex flex-wrap gap-1 pt-0.5">
                   {Object.entries(variantOptions).map(([key, value]: any) => (
-                    <span key={key} className="text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 px-2 py-0.5 rounded-md uppercase tracking-wide">
+                    <span key={key} className="text-[9px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 px-1.5 py-0.5 rounded uppercase tracking-wide">
                       {key}: {value}
                     </span>
                   ))}
                 </div>
               )}
               
-              {sku && (
-                <p className="text-[10px] text-slate-400 font-mono tracking-tight">SKU: {sku}</p>
-              )}
+              <div className="pt-1 flex items-baseline gap-2 text-xs text-slate-500 dark:text-neutral-400">
+                <span>Qty: <b className="text-slate-800 dark:text-white font-bold">{quantity}</b></span>
+                <span>•</span>
+                <span>Unit: ₦{unitPriceDisplay.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
 
-              <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium pt-1">Quantity units: {quantity}</p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">
-                Total aggregate
-              </p>
-              <p className="text-lg font-black text-amber-500">
-                ₦{totalPrice.toLocaleString()}
-              </p>
-            </div>
+          {/* TOTAL AGGREGATE PANEL BAR */}
+          <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/60 flex justify-between items-center">
+            <span className="text-[10px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">
+              Total aggregate
+            </span>
+            <p className="text-lg font-black text-amber-500">
+              ₦{totalPrice.toLocaleString()}
+            </p>
           </div>
         </div>
 
@@ -204,10 +241,12 @@ const OrderPage = () => {
                 <div className="flex justify-between items-center mb-1">
                   <p className="font-bold text-slate-800 dark:text-neutral-100 text-sm">{acc.bankName}</p>
                   {selectedAccount?._id === acc._id && (
-                    <div className="w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-neutral-900 shadow-xs" />
+                    <div className="w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-neutral-900 shadow-xs flex-shrink-0" />
                   )}
                 </div>
-                <p className="text-xs font-semibold text-slate-500 dark:text-neutral-400 tracking-wider">{acc.accountNumber}</p>
+                <p className="text-xs font-mono font-bold text-slate-600 dark:text-neutral-300 tracking-wider break-all">
+                  {acc.accountNumber}
+                </p>
               </div>
             ))
           )}
@@ -228,14 +267,14 @@ const OrderPage = () => {
                 Account Number Reference
               </p>
 
-              <div className="flex items-center gap-3 mb-6">
-                <h2 className="text-2xl font-black tracking-wider font-mono text-amber-400">
+              <div className="flex items-center justify-between gap-3 bg-black/20 p-3 rounded-xl border border-white/5 mb-6">
+                <h2 className="text-xl sm:text-2xl font-black tracking-wide font-mono text-amber-400 select-all break-all min-w-0">
                   {selectedAccount.accountNumber}
                 </h2>
 
                 <button
                   onClick={copyToClipboard}
-                  className="p-2 bg-white/5 dark:bg-neutral-800 rounded-lg hover:bg-white/10 transition-all active:scale-90"
+                  className="p-2 bg-white/5 dark:bg-neutral-800 rounded-lg hover:bg-white/10 transition-all active:scale-90 flex-shrink-0"
                 >
                   {copied ? (
                     <Check size={14} className="text-emerald-400" />
@@ -246,14 +285,14 @@ const OrderPage = () => {
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start border-t border-white/5 dark:border-neutral-800 pt-4">
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-[9px] opacity-40 uppercase tracking-widest font-black mb-0.5">Bank Hub</p>
-                  <p className="font-bold text-xs text-slate-200">{selectedAccount.bankName}</p>
+                  <p className="font-bold text-xs text-slate-200 truncate">{selectedAccount.bankName}</p>
                 </div>
                 
-                <div className="sm:text-right max-w-full sm:max-w-[65%]">
+                <div className="sm:text-right flex-1 min-w-0">
                   <p className="text-[9px] opacity-40 uppercase tracking-widest font-black mb-0.5">Beneficiary Account Name</p>
-                  <p className="font-bold text-xs text-slate-100 break-words leading-tight whitespace-normal">
+                  <p className="font-bold text-xs text-slate-100 break-words tracking-tight leading-tight whitespace-normal">
                     {selectedAccount.accountName}
                   </p>
                 </div>

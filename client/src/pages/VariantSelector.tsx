@@ -184,24 +184,36 @@ export default function VariantSelector({
     });
   };
 
+  // FIXED: Aggregates and returns ALL variants containing quantities instead of a single active row
   const handleConfirm = () => {
-    const finalOrders = Object.entries(quantities)
-      .map(([compositeKey, qty]) => {
-        const keyParts = compositeKey.split("___");
-        
-        const matchedVariant = variants.find((v) => {
-          return attributeLayers.every((layer, idx) => {
-            const val = v.options?.[layer.name] || "Standard";
-            return val === keyParts[idx];
-          });
+    if (totalQuantity <= 0) {
+      alert("Please add at least 1 unit to your configuration configurations.");
+      return;
+    }
+
+    const compiledOrders: Array<{ variant: Variant; qty: number }> = [];
+
+    // Loop over every combination that has quantities allocated to it
+    Object.entries(quantities).forEach(([compositeKey, qty]) => {
+      if (qty <= 0) return;
+
+      // Locate the original variant object matching this composite signature key
+      const foundVariant = variants.find((v) => getCompositeKey(v) === compositeKey);
+      
+      if (foundVariant) {
+        compiledOrders.push({
+          variant: foundVariant,
+          qty: qty
         });
+      }
+    });
 
-        return { variant: matchedVariant!, qty };
-      })
-      .filter((o) => o.variant && o.qty > 0);
-
-    onConfirm(finalOrders);
-    setIsOpen(false);
+    if (compiledOrders.length > 0) {
+      onConfirm(compiledOrders);
+      setIsOpen(false);
+    } else {
+      alert("Selected configurations configurations are currently unavailable.");
+    }
   };
 
   return (
@@ -266,7 +278,6 @@ export default function VariantSelector({
                     <div className="text-base font-black text-orange-600 dark:text-orange-500">
                       {currencySymbol}{(measurement?.pricePerUnit || basePrice).toLocaleString()}
                     </div>
-                    {/* CHANGED: Falls back to 1 unit default text instead of 2 */}
                     <div className="text-[10px] text-slate-400 font-medium">Min. order: {measurement?.minOrder || 1} units</div>
                   </div>
                   <div>
@@ -347,7 +358,7 @@ export default function VariantSelector({
                       const rowImage = v.images?.[0] || (v.options?.Color ? getColorThumbnail(v.options.Color) : defaultImage);
 
                       return (
-                        <div key={v._id} className="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-neutral-950/30 rounded-xl border border-slate-100 dark:border-neutral-800/50">
+                        <div key={v._id} className="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-neutral-955/30 rounded-xl border border-slate-100 dark:border-neutral-800/50">
                           <div className="flex items-center gap-3">
                             <div 
                               onClick={() => setLightboxImage(rowImage)}
@@ -367,6 +378,7 @@ export default function VariantSelector({
                           {/* Plus / Minus Counter Adjusters */}
                           <div className="flex items-center gap-3 bg-white dark:bg-neutral-950 p-1 rounded-xl border dark:border-neutral-800">
                             <button
+                              type="button"
                               onClick={() => updateQty(v, "minus", stock)}
                               disabled={currentQty === 0}
                               className="w-7 h-7 bg-slate-50 dark:bg-neutral-900 rounded-lg shadow-xs flex items-center justify-center text-slate-800 dark:text-white disabled:opacity-30 border dark:border-neutral-800/40"
@@ -377,6 +389,7 @@ export default function VariantSelector({
                               {currentQty}
                             </span>
                             <button
+                              type="button"
                               onClick={() => updateQty(v, "plus", stock)}
                               disabled={currentQty >= stock}
                               className="w-7 h-7 bg-slate-50 dark:bg-neutral-900 rounded-lg shadow-xs flex items-center justify-center text-slate-800 dark:text-white disabled:opacity-30 border dark:border-neutral-800/40"
@@ -400,7 +413,6 @@ export default function VariantSelector({
             </div>
 
             {/* FIXED FOOTER CONTROLLER BAR */}
-            {/* CHANGED: Button disable condition and validation error message both point to 1 as fallback default */}
             <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-neutral-900 border-t border-slate-100 dark:border-neutral-800 p-4 space-y-3 z-20 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] flex-shrink-0">
               <div className="flex justify-between items-baseline">
                 <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">Subtotal</span>
@@ -413,6 +425,7 @@ export default function VariantSelector({
               </div>
 
               <button
+                type="button"
                 onClick={handleConfirm}
                 disabled={totalQuantity < (measurement?.minOrder || 1)}
                 className="w-full h-12 rounded-full font-bold text-sm bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md active:scale-98 transition-all disabled:from-slate-200 disabled:to-slate-200 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 disabled:text-slate-400 disabled:cursor-not-allowed"

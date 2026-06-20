@@ -4,28 +4,29 @@ export interface IOrder extends Document {
   refNumber: string;
 
   productId: mongoose.Types.ObjectId;
-  variantId?: mongoose.Types.ObjectId;   // 👈 ADD THIS
-
-  sku?: string;                          // 👈 ADD THIS
-  unitPrice?: number;     
-
-
 
   businessId: mongoose.Types.ObjectId;
   ownerId: mongoose.Types.ObjectId;
 
   platformAccountId: mongoose.Types.ObjectId;
 
-  quantity: number;
-  notes?: string;
+  items: Array<{
+    variantId: mongoose.Types.ObjectId;
+    sku: string;
+    unitPrice: number;
+    quantity: number;
+    totalPrice: number;
+  }>;
+
   totalPrice: number;
+
+  notes?: string;
 
   commission?: number;
   vendorAmount?: number;
 
   paymentMethod: "bank_transfer";
 
-  // CUSTOMER VIEW
   customerStatus:
     | "pending_payment"
     | "processing"
@@ -33,7 +34,6 @@ export interface IOrder extends Document {
     | "completed"
     | "cancelled";
 
-  // INTERNAL
   internalStatus:
     | "pending_payment"
     | "payment_received"
@@ -51,25 +51,15 @@ export interface IOrder extends Document {
 
 const OrderSchema = new Schema<IOrder>(
   {
-   refNumber: {
-  type: String,
-
-},
+    refNumber: {
+      type: String,
+    },
 
     productId: {
       type: Schema.Types.ObjectId,
       ref: "Product",
       required: true,
     },
-
-    variantId: {
-  type: Schema.Types.ObjectId,
-  ref: "Variant",
-},
-
-sku: String,
-
-unitPrice: Number,
 
     businessId: {
       type: Schema.Types.ObjectId,
@@ -89,16 +79,39 @@ unitPrice: Number,
       required: true,
     },
 
-    quantity: {
-      type: Number,
-      required: true,
-      min: 1,
-    },
+    // =========================
+    // 🔥 NEW CORE STRUCTURE
+    // =========================
+    items: [
+      {
+        variantId: {
+          type: Schema.Types.ObjectId,
+          ref: "Variant",
+          required: true,
+        },
 
-    notes: {
-      type: String,
-      default: "",
-    },
+        sku: {
+          type: String,
+          required: true,
+        },
+
+        unitPrice: {
+          type: Number,
+          required: true,
+        },
+
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+        },
+
+        totalPrice: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
 
     totalPrice: {
       type: Number,

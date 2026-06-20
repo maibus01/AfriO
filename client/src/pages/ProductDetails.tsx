@@ -4,8 +4,7 @@ import { PhotoProvider, PhotoView } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
 import {
   Heart, ArrowLeft, Share2, 
-  Verified, ExternalLink, Plus, Minus, Layers,
-  MessageSquare, ShoppingCart, ShieldCheck, Truck, Zap
+  Verified, ExternalLink, ShieldCheck, Truck, Zap
 } from "lucide-react";
 import VariantSelector from "./VariantSelector";
 
@@ -45,6 +44,7 @@ interface Product {
   name: string;
   basePrice: number;
   currency: string;
+  sku?: string;
   category?: string;
   condition?: string;
   stock?: number;
@@ -59,6 +59,11 @@ interface Product {
   origin?: Origin;
 }
 
+interface ConfirmedOrder {
+  variant: Variant;
+  qty: number;
+}
+
 export default function ProductDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -69,12 +74,12 @@ export default function ProductDetails() {
 
   // Gallery & Purchase UX States
   const [currentImage, setCurrentImage] = useState<number>(0);
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<number>(1); // Fallback standard qty
   const [notes, setNotes] = useState<string>("");
   const [isLiked, setIsLiked] = useState<boolean>(false);
 
-  // Matrix Wholesale States (Alibaba Style)
-  const [selectedMatrixOrders, setSelectedMatrixOrders] = useState<Array<{ variant: Variant; qty: number }>>([]);
+  // Multi-SKU Selection State
+  const [selectedOrders, setSelectedOrders] = useState<ConfirmedOrder[]>([]);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState<boolean>(false);
 
   const galleryRef = useRef<HTMLDivElement>(null);
@@ -167,17 +172,44 @@ export default function ProductDetails() {
     scrollToActiveThumbnail(index);
   };
 
+  const visualCurrency = useMemo(() => {
+    if (!product) return "₦";
+    return CURRENCY_SYMBOLS[product.currency] || product.currency || "₦";
+  }, [product]);
+
   // Wholesale Engine calculations
-  const currentUnitPrice = useMemo<number>(() => {
-    if (!product) return 0;
-    const price = product.measurement?.pricePerUnit || product.basePrice;
-    if (quantity >= 500) return price * 0.95; // 5% bulk discount
-    return price;
-  }, [product, quantity]);
+  const totalQuantity = useMemo<number>(() => {
+    if (selectedOrders.length > 0) {
+      return selectedOrders.reduce((sum, item) => sum + item.qty, 0);
+    }
+    return quantity;
+  }, [selectedOrders, quantity]);
 
   const totalCalculatedPrice = useMemo<number>(() => {
-    return currentUnitPrice * quantity;
-  }, [currentUnitPrice, quantity]);
+    if (!product) return 0;
+    
+    if (selectedOrders.length > 0) {
+      return selectedOrders.reduce((total, item) => {
+        let unitPrice = item.variant.price || product.measurement?.pricePerUnit || product.basePrice;
+        if (totalQuantity >= 500) unitPrice *= 0.95; // 5% bulk discount applied globally
+        return total + (unitPrice * item.qty);
+      }, 0);
+    }
+
+    let baseUnit = product.measurement?.pricePerUnit || product.basePrice;
+    if (quantity >= 500) baseUnit *= 0.95;
+    return baseUnit * quantity;
+  }, [product, selectedOrders, quantity, totalQuantity]);
+
+  const pricingLabelText = useMemo<string>(() => {
+    if (!product) return "";
+    if (selectedOrders.length === 1) {
+      const price = selectedOrders[0].variant.price || product.measurement?.pricePerUnit || product.basePrice;
+      return `${visualCurrency}${(totalQuantity >= 500 ? price * 0.95 : price).toLocaleString()}`;
+    }
+    const defaultPrice = product.measurement?.pricePerUnit || product.basePrice;
+    return `${visualCurrency}${(totalQuantity >= 500 ? defaultPrice * 0.95 : defaultPrice).toLocaleString()}`;
+  }, [product, selectedOrders, totalQuantity, visualCurrency]);
 
   const currentMaxStock = useMemo<number>(() => {
     if (product?.variants && product.variants.length > 0) {
@@ -195,14 +227,28 @@ export default function ProductDetails() {
 
   const handleStartOrder = () => {
     if (!product) return;
+    
     navigate("/order", {
       state: {
         product,
-        matrixOrders: selectedMatrixOrders.length > 0 ? selectedMatrixOrders : null,
-        quantity,
+        selectedItems: selectedOrders.length > 0 
+          ? selectedOrders.map(item => ({
+              variantId: item.variant._id,
+              sku: item.variant.sku || product.sku || "",
+              variantOptions: item.variant.options || null,
+              quantity: item.qty,
+              price: item.variant.price || product.measurement?.pricePerUnit || product.basePrice
+            }))
+          : [{
+              variantId: null,
+              sku: product.sku || "",
+              variantOptions: null,
+              quantity: quantity,
+              price: product.measurement?.pricePerUnit || product.basePrice
+            }],
         notes,
         calculatedPrice: totalCalculatedPrice,
-        checkoutType: "direct_order"
+        totalQuantity: totalQuantity
       }
     });
   };
@@ -227,7 +273,6 @@ export default function ProductDetails() {
 
   if (!product) return null;
 
-  const visualCurrency = CURRENCY_SYMBOLS[product.currency] || product.currency || "₦";
   const businessIdString = typeof product.businessId === "object" ? product.businessId?._id : product.businessId;
   const businessName = typeof product.businessId === "object" ? product.businessId?.name : "Verified Supplier";
 
@@ -312,7 +357,7 @@ export default function ProductDetails() {
                 <div className="mt-4 p-3 bg-gradient-to-r from-amber-50/60 to-amber-100/20 dark:from-neutral-950 dark:to-neutral-950 rounded-xl border border-amber-100/40 dark:border-neutral-800">
                   <div className="flex items-baseline gap-1">
                     <span className="text-2xl md:text-3xl font-black text-amber-600 dark:text-amber-500">
-                      {visualCurrency}{currentUnitPrice.toLocaleString()}
+                      {pricingLabelText}
                     </span>
                     <span className="text-xs text-slate-500 font-medium">
                       /{product.measurement?.unit || 'Piece'}
@@ -370,15 +415,12 @@ export default function ProductDetails() {
                   isOpen={isVariantModalOpen}
                   setIsOpen={setIsVariantModalOpen}
                   onConfirm={(orders) => {
-                    setSelectedMatrixOrders(orders);
-                    const totalQty = orders.reduce((sum, o) => sum + o.qty, 0);
-                    if (totalQty > 0) setQuantity(totalQty);
+                    if (orders && orders.length > 0) {
+                      setSelectedOrders(orders);
+                    }
                   }}
                 />
               )}
-
-              {/* MANUAL QUANTITY CONTROLLER (SHOWS IF NO VARIANTS Exist) */}
-            
 
               {/* SOURCING REQUIREMENTS */}
               <div className="bg-white dark:bg-neutral-900 p-4 md:rounded-2xl shadow-xs border-y md:border border-neutral-200/40 dark:border-neutral-800/60">
@@ -413,34 +455,20 @@ export default function ProductDetails() {
 
         {/* BOTTOM FIXED APP ACTION BAR */}
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 px-4 py-3 z-30 flex items-center justify-between gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-          {/* <button className="flex flex-col items-center justify-center text-slate-600 dark:text-neutral-400 active:scale-95 transition-transform px-2">
-            <MessageSquare size={20} className="text-slate-700 dark:text-neutral-300" />
-            <span className="text-[10px] mt-0.5 font-medium whitespace-nowrap">Chat Now</span>
-          </button> */}
-
-          <div className="flex-1 grid grid-cols-2 gap-2">
-            {/* <button
-              disabled={currentMaxStock <= 0}
-              onClick={() => setIsVariantModalOpen(true)}
-              className="w-full h-11 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 border border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-50/30 dark:bg-transparent disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ShoppingCart size={14} />
-              <span>Add to Cart</span>
-            </button> */}
-
+          <div className="w-full max-w-xl mx-auto">
             <button
               onClick={() => {
-                if (product.variants && product.variants.length > 0 && selectedMatrixOrders.length === 0) {
+                if (product.variants && product.variants.length > 0 && selectedOrders.length === 0) {
                   setIsVariantModalOpen(true);
                 } else {
                   handleStartOrder();
                 }
               }}
-              disabled={currentMaxStock <= 0 || quantity < minAllowedQty}
+              disabled={currentMaxStock <= 0 || totalQuantity < minAllowedQty}
               className="w-full h-11 rounded-full font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm shadow-amber-500/20 disabled:from-neutral-300 disabled:to-neutral-300 dark:disabled:from-neutral-800 dark:disabled:to-neutral-800 disabled:text-slate-500 disabled:cursor-not-allowed"
             >
               <Zap size={14} className="fill-white" />
-              <span>{selectedMatrixOrders.length > 0 ? `Start Order (${quantity})` : 'Start Order'}</span>
+              <span>{selectedOrders.length > 0 ? `Start Order (${totalQuantity})` : 'Start Order'}</span>
             </button>
           </div>
         </div>

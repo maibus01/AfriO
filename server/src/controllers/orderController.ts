@@ -21,10 +21,9 @@ export const createOrder = async (req: any, res: Response) => {
     const {
       productId,
       businessId,
-      quantity,
-      notes,
       platformAccountId,
-      variantId, // 👈 MAIN INPUT
+      notes,
+      items,
     } = req.body;
 
     // =========================
@@ -49,65 +48,63 @@ export const createOrder = async (req: any, res: Response) => {
       });
     }
 
-    let unitPrice = product.basePrice || 0;
-    let variant = null;
+    let grandTotal = 0;
 
     // =========================
-    // VARIANT MODE (YOUR REQUIREMENT)
+    // BUILD ITEMS ARRAY
     // =========================
-    if (variantId) {
-      variant = await Variant.findById(variantId);
+    const orderItems = await Promise.all(
+      items.map(async (item: any) => {
+        const variant = await Variant.findById(item.variantId);
 
-      if (!variant || !variant.isActive) {
-        return res.status(404).json({
-          message: "Variant not found",
-        });
-      }
+        if (!variant || !variant.isActive) {
+          throw new Error("Invalid variant selected");
+        }
 
-      if (variant.stock < quantity) {
-        return res.status(400).json({
-          message: "Insufficient stock",
-        });
-      }
+        if (variant.stock < item.quantity) {
+          throw new Error(`Insufficient stock for SKU: ${variant.sku}`);
+        }
 
-      unitPrice = variant.price;
-    }
+        const unitPrice = variant.price;
+        const totalPrice = unitPrice * item.quantity;
 
-    const totalPrice = unitPrice * quantity;
+        grandTotal += totalPrice;
+
+        return {
+          variantId: variant._id,
+          sku: variant.sku,
+          unitPrice,
+          quantity: item.quantity,
+          totalPrice,
+        };
+      })
+    );
 
     // =========================
-    // CREATE ORDER (NOW WITH FULL VARIANT DATA)
+    // CREATE ORDER
     // =========================
     const order = await Order.create({
       productId,
       businessId,
       ownerId: req.user.id,
 
-      quantity,
-      notes,
-
-      totalPrice,
       platformAccountId,
 
-      // 🔥 VARIANT SNAPSHOT (WHAT YOU WANTED)
-      variantId: variant?._id,
-      sku: variant?.sku,
-      unitPrice: unitPrice,
+      items: orderItems,
+      totalPrice: grandTotal,
+
+      notes,
 
       customerStatus: "pending_payment",
       internalStatus: "pending_payment",
     });
 
     // =========================
-    // STOCK REDUCTION
+    // REDUCE STOCK
     // =========================
-    if (variant) {
-      await Variant.findByIdAndUpdate(variant._id, {
-        $inc: { stock: -quantity },
-      });
-    } else {
-      await Product.findByIdAndUpdate(productId, {
-        $inc: { stock: -quantity },
+    for (const item of items) {
+      await Variant.findByIdAndUpdate(item.variantId, {
+        $inc: { stock: -item.quantity },
       });
     }
 
@@ -117,7 +114,9 @@ export const createOrder = async (req: any, res: Response) => {
     });
   } catch (err: any) {
     console.error("CREATE ORDER ERROR:", err);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
