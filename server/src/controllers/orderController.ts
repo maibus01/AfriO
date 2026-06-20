@@ -4,6 +4,7 @@ import { PlatformAccount } from "../models/PlatformAccount";
 import { Business } from "../models/Business";
 import { Product } from "../models/Product";
 import { Variant } from "../models/Variant";
+import mongoose from "mongoose";
 
 // ==============================
 // HELPER → GET SELLER BUSINESSES
@@ -16,106 +17,109 @@ const getUserBusinessIds = async (userId: string) => {
 // ==============================
 // CREATE ORDER (CUSTOMER)
 // ==============================
-export const createOrder = async (req: any, res: Response) => {
+export const createOrder = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
-      productId,
-      businessId,
-      platformAccountId,
+      product,
+      selectedItems,
       notes,
-      items,
+      platformAccountId
     } = req.body;
 
-    // =========================
-    // VALIDATE PAYMENT ACCOUNT
-    // =========================
-    const account = await PlatformAccount.findById(platformAccountId);
-
-    if (!account || !account.isActive) {
-      return res.status(400).json({
-        message: "Invalid payment account",
-      });
+    // 1. Auth Guard Checklist Protection
+    // Ensure you have an authentication middleware attaching the logged-in user profile to req.user
+    const currentUserId = (req as any).user?._id; 
+    if (!currentUserId) {
+      res.status(401).json({ success: false, message: "Authentication required. You are not logged in." });
+      return;
     }
 
-    // =========================
-    // VALIDATE PRODUCT
-    // =========================
-    const product = await Product.findById(productId);
-
-    if (!product || !product.isActive) {
-      return res.status(404).json({
-        message: "Product not found",
-      });
+    // 2. Incoming Payload Validations
+    if (!product?._id || !product.businessId) {
+      res.status(400).json({ success: false, message: "Invalid product or business tracking identifier metadata." });
+      return;
     }
 
-    let grandTotal = 0;
+    if (!selectedItems || !Array.isArray(selectedItems) || selectedItems.length === 0) {
+      res.status(400).json({ success: false, message: "Cannot process checkout: No targeted SKU configurations were provided." });
+      return;
+    }
 
-    // =========================
-    // BUILD ITEMS ARRAY
-    // =========================
-    const orderItems = await Promise.all(
-      items.map(async (item: any) => {
-        const variant = await Variant.findById(item.variantId);
+    if (!platformAccountId) {
+      res.status(400).json({ success: false, message: "Target collection platform payout routing account is required." });
+      return;
+    }
 
-        if (!variant || !variant.isActive) {
-          throw new Error("Invalid variant selected");
-        }
+    // Extract raw business ID string safely whether populated object or straight ID string string
+    const businessId = typeof product.businessId === "object" ? product.businessId._id : product.businessId;
 
-        if (variant.stock < item.quantity) {
-          throw new Error(`Insufficient stock for SKU: ${variant.sku}`);
-        }
+    // 3. Financial Accumulation Engines
+    let calculatedTotalPrice = 0;
+    let totalQuantityCalculated = 0;
 
-        const unitPrice = variant.price;
-        const totalPrice = unitPrice * item.quantity;
+    // Accumulate total pieces coming across all variant configurations to evaluate wholesale matrix limits
+    const cumulativePiecesCount = selectedItems.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
 
-        grandTotal += totalPrice;
+    // Format individual variant blocks safely for Mongoose model instantiation rules
+    const formattedOrderItems = selectedItems.map((item: any) => {
+      // Use the variant price or fallback directly to product tracking baselines
+      let baselinePrice = Number(item.price || product.measurement?.pricePerUnit || product.basePrice || 0);
+      
+      // Wholesale Rule: If cumulative total purchase across all styles meets or passes 500 units, apply 5% discount
+      if (cumulativePiecesCount >= 500) {
+        baselinePrice = baselinePrice * 0.95;
+      }
 
-        return {
-          variantId: variant._id,
-          sku: variant.sku,
-          unitPrice,
-          quantity: item.quantity,
-          totalPrice,
-        };
-      })
-    );
+      const itemQty = Number(item.quantity || 1);
+      
+      // Calculate costs metrics for this subset block loop layer
+      calculatedTotalPrice += baselinePrice * itemQty;
+      totalQuantityCalculated += itemQty;
 
-    // =========================
-    // CREATE ORDER
-    // =========================
-    const order = await Order.create({
-      productId,
-      businessId,
-      ownerId: req.user.id,
+      return {
+        variantId: item.variantId ? new mongoose.Types.ObjectId(item.variantId) : undefined,
+        sku: item.sku || product.sku || "",
+        unitPrice: baselinePrice,
+        quantity: itemQty
+      };
+    });
 
-      platformAccountId,
+    // 4. Split Payment / Escrow Broker Computations (e.g., 5% Marketplace Platform Commission fee rule)
+    const commissionRate = 0.05; 
+    const commissionAmount = calculatedTotalPrice * commissionRate;
+    const vendorPayoutAmount = calculatedTotalPrice - commissionAmount;
 
-      items: orderItems,
-      totalPrice: grandTotal,
-
-      notes,
-
+    // 5. Construct and Save standard document transaction context
+    const newOrder = new Order({
+      productId: new mongoose.Types.ObjectId(product._id),
+      items: formattedOrderItems,
+      businessId: new mongoose.Types.ObjectId(businessId),
+      ownerId: new mongoose.Types.ObjectId(currentUserId),
+      platformAccountId: new mongoose.Types.ObjectId(platformAccountId),
+      totalQuantity: totalQuantityCalculated,
+      totalPrice: calculatedTotalPrice,
+      commission: commissionAmount,
+      vendorAmount: vendorPayoutAmount,
+      notes: notes || "",
       customerStatus: "pending_payment",
       internalStatus: "pending_payment",
+      paymentMethod: "bank_transfer"
     });
 
-    // =========================
-    // REDUCE STOCK
-    // =========================
-    for (const item of items) {
-      await Variant.findByIdAndUpdate(item.variantId, {
-        $inc: { stock: -item.quantity },
-      });
-    }
+    const savedOrder = await newOrder.save();
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      order,
+      message: "Multi-SKU transaction matrix generated successfully.",
+      data: savedOrder
     });
-  } catch (err: any) {
-    console.error("CREATE ORDER ERROR:", err);
-    return res.status(500).json({
-      message: err.message,
+
+  } catch (error: any) {
+    console.error("Order Engine Exception Handler:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Processing Failure within order engine mapping parameters.",
+      error: error.message
     });
   }
 };
