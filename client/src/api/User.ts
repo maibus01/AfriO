@@ -1,7 +1,9 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://afrio-api.onrender.com/api",
+  baseURL: window.location.hostname === "localhost"
+    ? "http://localhost:5000/api"
+    : "https://afrio-api.onrender.com/api",
 });
 // Attach token automatically
 API.interceptors.request.use((req) => {

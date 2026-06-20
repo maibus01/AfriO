@@ -14,29 +14,44 @@ import {
 } from "lucide-react";
 import API from "../api/User";
 
+interface VariantItem {
+  _id: string;
+  productId: string;
+  variantId?: {
+    _id: string;
+    name: string;
+    image?: string;
+  };
+  sku?: string;
+  image?: string; // Direct image URL on the line item SKU variant
+  quantity: number;
+  unitPrice: number;
+}
+
 interface OrderData {
   _id: string;
   refNumber: string;
   internalStatus:
-  | "pending_payment"
-  | "payment_received"
-  | "processing"
-  | "ready_for_pickup"
-  | "unavailable"
-  | "delivered";
+    | "pending_payment"
+    | "payment_received"
+    | "processing"
+    | "ready_for_pickup"
+    | "unavailable"
+    | "delivered";
   customerStatus:
-  | "pending_payment"
-  | "processing"
-  | "delivered"
-  | "completed";
-  quantity: number;
+    | "pending_payment"
+    | "processing"
+    | "delivered"
+    | "completed";
+  items?: VariantItem[];
+  quantity?: number;
   totalPrice: number;
   ownerId: {
     _id: string;
     name: string;
     email: string;
   };
-  productId: {
+  productId?: {
     _id: string;
     name: string;
     images: string[];
@@ -58,7 +73,7 @@ const SellerOrderManager = () => {
   const fetchOrders = async () => {
     try {
       const res = await API.get("/orders/seller");
-      const list = res.data.orders || [];
+      const list = res.data.orders || res.data.data || res.data || [];
       setOrders(list);
     } catch (err) {
       console.error("FETCH_ERROR:", err);
@@ -96,15 +111,6 @@ const SellerOrderManager = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="w-full py-12 flex flex-col items-center justify-center gap-3">
-        <div className="w-8 h-8 border-3 border-slate-200 border-t-slate-900 dark:border-neutral-800 dark:border-t-white rounded-full animate-spin" />
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Loading Order Ledger...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full space-y-4">
       {/* COMPACT SUMMARY STRIP */}
@@ -119,46 +125,97 @@ const SellerOrderManager = () => {
       </div>
 
       {/* COMPACT ORDER CARD LIST GRID */}
-      {orders.length === 0 ? (
+      {loading ? (
+        <div className="w-full py-12 flex flex-col items-center justify-center gap-3">
+          <div className="w-8 h-8 border-3 border-slate-200 border-t-slate-900 dark:border-neutral-800 dark:border-t-white rounded-full animate-spin" />
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Loading Order Ledger...</p>
+        </div>
+      ) : orders.length === 0 ? (
         <div className="bg-white dark:bg-neutral-900 rounded-xl p-8 border border-dashed border-slate-200 dark:border-neutral-800 text-center">
           <ShoppingBag size={24} className="mx-auto mb-2 text-slate-300" />
           <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">No active orders found</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {orders.map((order) => (
-            <div
-              key={order._id}
-              onClick={() => {
-                setSelectedOrder(order);
-                setIsModalOpen(true);
-              }}
-              className="group bg-white dark:bg-neutral-900 p-3.5 rounded-xl border border-slate-200/70 dark:border-neutral-800/70 shadow-sm hover:border-slate-400 dark:hover:border-neutral-600 transition-all cursor-pointer active:scale-[0.99]"
-            >
-              <div className="flex justify-between items-center mb-2.5">
-                <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${getStatusTheme(order.internalStatus)}`}>
-                  {order.internalStatus.replace("_", " ")}
-                </span>
-                <span className="text-[10px] font-mono text-slate-400 font-medium">
-                  #{order.refNumber}
-                </span>
-              </div>
+          {orders.map((order) => {
+            const masterProductImage = order.productId?.images?.[0] || "";
 
-              <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-tight mb-2 line-clamp-1 uppercase tracking-tight">
-                {order.productId?.name || "Unknown Product"}
-              </h4>
+            return (
+              <div
+                key={order._id}
+                onClick={() => {
+                  setSelectedOrder(order);
+                  setIsModalOpen(true);
+                }}
+                className="group bg-white dark:bg-neutral-900 p-3.5 rounded-xl border border-slate-200/70 dark:border-neutral-800/70 shadow-sm hover:border-slate-400 dark:hover:border-neutral-600 transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex justify-between items-center mb-2.5">
+                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${getStatusTheme(order.internalStatus)}`}>
+                    {order.internalStatus.replace("_", " ")}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400 font-medium">
+                    #{order.refNumber}
+                  </span>
+                </div>
 
-              <div className="flex justify-between items-center pt-2.5 border-t border-slate-100 dark:border-neutral-800/60">
-                <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-medium flex items-center gap-1 max-w-[60%] truncate">
-                  <User size={11} className="text-slate-400 shrink-0" /> 
-                  {order.ownerId?.name ? order.ownerId.name.split(" ")[0] : "Client"}
-                </span>
-                <span className="font-bold text-slate-900 dark:text-white text-xs">
-                  ₦{order.totalPrice.toLocaleString()}
-                </span>
+                {/* EACH VARIANT SHOWS ITS OWN CORRECT IMAGE */}
+                <div className="space-y-2 mb-3">
+                  {order.items && order.items.length > 0 ? (
+                    order.items.map((subItem, index) => {
+                      // FIXED: Prioritize specific variant image properties over parent fallback
+                      const computedImg = subItem.image || subItem.variantId?.image || masterProductImage;
+                      
+                      return (
+                        <div key={subItem._id || index} className="flex items-center gap-2 text-xs">
+                          {computedImg ? (
+                            <img src={computedImg} className="w-6 h-7 rounded object-cover border border-slate-100 dark:border-neutral-800 shrink-0" alt="" />
+                          ) : (
+                            <div className="w-6 h-7 bg-slate-100 dark:bg-neutral-800 rounded shrink-0" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-900 dark:text-white truncate line-clamp-1 text-[11px]">
+                              {order.productId?.name || "Catalog Manifest Item"}
+                            </p>
+                            <p className="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold truncate">
+                              SKU: {subItem.sku || subItem.variantId?.name || "Standard Base"}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                            x{subItem.quantity}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    /* Backward compatibility fallback */
+                    <div className="flex items-center gap-2 text-xs">
+                      {masterProductImage ? (
+                        <img src={masterProductImage} className="w-6 h-7 rounded object-cover border border-slate-100 shrink-0" alt="" />
+                      ) : (
+                        <div className="w-6 h-7 bg-slate-100 dark:bg-neutral-800 rounded shrink-0" />
+                      )}
+                      <p className="font-bold text-slate-900 dark:text-white truncate flex-1 uppercase tracking-tight text-[11px]">
+                        {order.productId?.name || "Catalog Product"}
+                      </p>
+                      <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                        x{order.quantity || 1}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center pt-2.5 border-t border-slate-100 dark:border-neutral-800/60">
+                  <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-medium flex items-center gap-1 max-w-[60%] truncate">
+                    <User size={11} className="text-slate-400 shrink-0" /> 
+                    {order.ownerId?.name ? order.ownerId.name.split(" ")[0] : "Client"}
+                  </span>
+                  <span className="font-bold text-slate-900 dark:text-white text-xs">
+                    ₦{order.totalPrice.toLocaleString()}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -184,25 +241,64 @@ const SellerOrderManager = () => {
             {/* Modal Content Space */}
             <div className="p-4 space-y-4 overflow-y-auto">
               
-              {/* Simple Product Block */}
-              <div className="flex gap-3 bg-slate-50 dark:bg-neutral-950 p-2.5 rounded-lg border border-slate-100 dark:border-neutral-800/40">
-                {selectedOrder.productId?.images?.[0] ? (
-                  <img
-                    src={selectedOrder.productId.images[0]}
-                    className="w-14 h-16 object-cover rounded-md shrink-0 border border-slate-200 dark:border-neutral-800"
-                    alt=""
-                  />
+              {/* Product and Variant Items Breakdown Stack */}
+              <div className="space-y-2">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Items & Custom Variants</p>
+                
+                {selectedOrder.items && selectedOrder.items.length > 0 ? (
+                  selectedOrder.items.map((subItem, index) => {
+                    // FIXED: Prioritize specific variant image properties inside modal loop too
+                    const variantImg = subItem.image || subItem.variantId?.image || selectedOrder.productId?.images?.[0];
+                    
+                    return (
+                      <div key={subItem._id || index} className="flex gap-3 bg-slate-50 dark:bg-neutral-950 p-2.5 rounded-lg border border-slate-100 dark:border-neutral-800/40 items-center">
+                        {variantImg ? (
+                          <img
+                            src={variantImg}
+                            className="w-12 h-14 object-cover rounded-md shrink-0 border border-slate-200 dark:border-neutral-800 bg-white"
+                            alt=""
+                          />
+                        ) : (
+                          <div className="w-12 h-14 bg-slate-200 dark:bg-neutral-800 rounded-md shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase leading-tight line-clamp-1">
+                            {selectedOrder.productId?.name || "Catalog Specification Asset"}
+                          </h3>
+                          <p className="text-[10px] font-medium text-slate-500 dark:text-neutral-400 mt-0.5">
+                            SKU Variant: <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">{subItem.sku || subItem.variantId?.name || "Standard Layout"}</span>
+                          </p>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">Unit Price: ₦{(subItem.unitPrice || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span className="text-xs font-black text-slate-900 dark:text-white bg-slate-200 dark:bg-neutral-800 px-2 py-1 rounded-md">
+                            x{subItem.quantity}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
-                  <div className="w-14 h-16 bg-slate-200 dark:bg-neutral-800 rounded-md shrink-0" />
+                  /* Legacy Fallback Row */
+                  <div className="flex gap-3 bg-slate-50 dark:bg-neutral-950 p-2.5 rounded-lg border border-slate-100 dark:border-neutral-800/40 items-center">
+                    {selectedOrder.productId?.images?.[0] ? (
+                      <img
+                        src={selectedOrder.productId.images[0]}
+                        className="w-12 h-14 object-cover rounded-md shrink-0 border border-slate-200 dark:border-neutral-800"
+                        alt=""
+                      />
+                    ) : (
+                      <div className="w-12 h-14 bg-slate-200 dark:bg-neutral-800 rounded-md shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase leading-tight line-clamp-1">{selectedOrder.productId?.name}</h3>
+                      <p className="text-[10px] text-slate-400 italic">Standard Single Layout Base</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="text-xs font-black text-slate-900 dark:text-white bg-slate-200 dark:bg-neutral-800 px-2 py-1 rounded-md">x{selectedOrder.quantity || 1}</span>
+                    </div>
+                  </div>
                 )}
-                <div className="flex flex-col justify-center min-w-0">
-                  <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase leading-tight line-clamp-2 mb-1">
-                    {selectedOrder.productId?.name}
-                  </h3>
-                  <span className="text-[10px] font-semibold text-slate-500">
-                    Quantity Ordered: <span className="text-slate-900 dark:text-white font-bold">{selectedOrder.quantity}</span>
-                  </span>
-                </div>
               </div>
 
               {/* Client & Financial Metadata Data Table */}

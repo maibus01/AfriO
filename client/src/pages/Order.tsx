@@ -24,28 +24,17 @@ const OrderPage = () => {
   const [copied, setCopied] = useState(false);
 
   // =========================================================================
-  // EXTRACT VARIANT DATA FROM ROUTING STATE
+  // EXTRACT MULTI-SKU STATE ARRAY FROM ROUTING CONTEXT
   // =========================================================================
-  // Added: variantPrice and variantImage extracted from the router state snapshot
   const { 
     product, 
-    variantId, 
-    sku, 
-    variantOptions, 
-    quantity, 
+    selectedItems, // ✅ Replaces single field parameters
     notes, 
     calculatedPrice,
-    variantPrice, 
-    variantImage 
+    totalQuantity 
   } = location.state || {};
   
-  const totalPrice = calculatedPrice || (product ? (product.measurement?.pricePerUnit || product.basePrice) * quantity : 0);
-  
-  // Determine item display price: Variant specific price, fallback to calculated split, fallback to product base
-  const unitPriceDisplay = variantPrice || (calculatedPrice ? calculatedPrice / quantity : (product?.measurement?.pricePerUnit || product?.basePrice || 0));
-  
-  // Determine item thumbnail image: Variant snapshot image, fallback to product main display image
-  const displayImage = variantImage || product?.image || product?.images?.[0] || null;
+  const totalPrice = calculatedPrice || 0;
 
   // 1. FETCH ACCOUNTS ON LOAD
   useEffect(() => {
@@ -69,7 +58,7 @@ const OrderPage = () => {
   }, [product]);
 
   // =========================================================================
-  // 2. CREATE ORDER (WITH VARIANT SAVE LOGIC) + WHATSAPP HANDOFF
+  // 2. CREATE ARRAY ORDER + MULTI-LINE WHATSAPP HANDOFF
   // =========================================================================
   const handleCompleteOrder = async () => {
     if (!selectedAccount) {
@@ -80,25 +69,30 @@ const OrderPage = () => {
     try {
       setProcessingOrder(true);
 
+      // ✅ Schema Payload matches the array requirements of your updated Controller
       const res = await API.post("/orders", {
-        productId: product._id,
-        variantId: variantId || null,
-        sku: sku || "",
-        unitPrice: totalPrice / quantity,
-        businessId: product.businessId?._id || product.businessId,
-        quantity,
+        product: {
+          _id: product._id,
+          businessId: product.businessId?._id || product.businessId,
+          basePrice: product.basePrice,
+          measurement: product.measurement
+        },
+        selectedItems, 
         notes,
-        totalPrice,
         platformAccountId: selectedAccount._id,
       });
 
-      const refNumber = res.data.order.refNumber || res.data.order._id.slice(-6).toUpperCase();
+      const refNumber = res.data.data?.refNumber || "N/A";
 
-      const variantSpecText = variantOptions 
-        ? Object.entries(variantOptions).map(([key, val]) => `\n*${key}:* ${val}`).join("")
-        : "";
+      // 📝 Generate structured text layout loop for WhatsApp messaging
+      const itemsReportText = selectedItems.map((item: any) => {
+        const specDetails = item.variantOptions
+          ? Object.entries(item.variantOptions).map(([k, v]) => ` (${k}: ${v})`).join("")
+          : "";
+        return `• Qty: ${item.quantity}x | SKU: ${item.sku || "Std"}${specDetails}`;
+      }).join("\n");
 
-      const rawMessage = `💎 *%F0%9F%92%8E AFRIO ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product:* ${product.name}${variantSpecText}\n*SKU:* ${sku || "N/A"}\n*Quantity:* ${quantity}\n*Total Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment To:* ${selectedAccount.bankName}\nNote: I have made the transfer. Please verify.`;
+      const rawMessage = `💎 *AFRIO ORDER RECEIPT*\n\n*Ref Number:* ${refNumber}\n*Product Base:* ${product.name}\n\n*Selected Package Line Items:*\n${itemsReportText}\n\n*Total Pieces:* ${totalQuantity}\n*Total Balance Amount:* ₦${totalPrice.toLocaleString()}\n\n*Payment Routed To:* ${selectedAccount.bankName}\n_Note: I have completed the direct bank transfer routing. Please verify transaction metrics._`;
 
       const message = encodeURIComponent(rawMessage);
       const phone = "2349027456061";
@@ -124,12 +118,12 @@ const OrderPage = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!product) {
+  if (!product || !selectedItems || selectedItems.length === 0) {
     return (
       <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-white dark:bg-black select-none">
         <ShoppingBag size={48} className="text-neutral-200 dark:text-neutral-800 mb-4" />
         <p className="font-black text-neutral-400 dark:text-neutral-500 uppercase text-[10px] tracking-widest">
-          No active order
+          No active order configuration
         </p>
         <button
           onClick={() => navigate("/")}
@@ -159,58 +153,67 @@ const OrderPage = () => {
         {/* ORDER OVERVIEW CARD */}
         <div className="bg-white dark:bg-neutral-900 p-5 rounded-2xl border border-neutral-100 dark:border-neutral-800/60 shadow-xs">
           <p className="text-[9px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-3">
-            Items Package
+            Items Bundle Package ({selectedItems.length})
           </p>
 
-          <div className="flex gap-4 items-start">
-            {/* 📸 SKU PICTURE BLOCK */}
-            {displayImage ? (
-              <img 
-                src={displayImage} 
-                alt={product.name} 
-                className="w-20 h-20 object-cover rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-950 flex-shrink-0"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center text-neutral-400 flex-shrink-0">
-                <ShoppingBag size={20} />
-              </div>
-            )}
+          {/* ✅ RENDER EACH SELECTED SKU AS A LINE ITEM ROW */}
+          <div className="divide-y divide-neutral-100 dark:divide-neutral-800/60 max-h-[280px] overflow-y-auto pr-1 space-y-3">
+            {selectedItems.map((item: any, idx: number) => {
+              // Extract the first available thumbnail product photo
+              const rowImage = product.images?.[0] || product.image || null;
 
-            {/* SKU META DETAILS & PRICES BLOCK */}
-            <div className="space-y-1 flex-1 min-w-0">
-              <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-sm line-clamp-2 leading-tight">
-                {product.name}
-              </h3>
-              
-              {sku && (
-                <p className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono bg-neutral-50 dark:bg-neutral-950 px-1.5 py-0.5 rounded border border-neutral-200/20 w-fit">
-                  SKU: {sku}
-                </p>
-              )}
+              return (
+                <div key={idx} className={`flex gap-4 items-start ${idx > 0 ? "pt-3" : ""}`}>
+                  {rowImage ? (
+                    <img 
+                      src={rowImage} 
+                      alt={product.name} 
+                      className="w-14 h-14 object-cover rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-950 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 flex items-center justify-center text-neutral-400 flex-shrink-0">
+                      <ShoppingBag size={16} />
+                    </div>
+                  )}
 
-              {variantOptions && (
-                <div className="flex flex-wrap gap-1 pt-0.5">
-                  {Object.entries(variantOptions).map(([key, value]: any) => (
-                    <span key={key} className="text-[9px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 px-1.5 py-0.5 rounded uppercase tracking-wide">
-                      {key}: {value}
-                    </span>
-                  ))}
+                  <div className="space-y-0.5 flex-1 min-w-0">
+                    <h3 className="font-bold text-slate-800 dark:text-neutral-100 text-xs line-clamp-1 leading-tight">
+                      {product.name}
+                    </h3>
+                    
+                    <p className="text-[10px] text-slate-400 dark:text-neutral-500 font-mono">
+                      SKU: {item.sku || "Standard"}
+                    </p>
+
+                    {item.variantOptions && (
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {Object.entries(item.variantOptions).map(([key, value]: any) => (
+                          <span key={key} className="text-[8px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 px-1 py-0.5 rounded uppercase tracking-wide">
+                            {key}: {value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="pt-0.5 flex items-baseline gap-2 text-[11px] text-slate-500 dark:text-neutral-400">
+                      <span>Quantity: <b className="text-slate-800 dark:text-white font-bold">{item.quantity}</b></span>
+                      <span>•</span>
+                      <span>Unit: ₦{item.price?.toLocaleString()}</span>
+                    </div>
+                  </div>
                 </div>
-              )}
-              
-              <div className="pt-1 flex items-baseline gap-2 text-xs text-slate-500 dark:text-neutral-400">
-                <span>Qty: <b className="text-slate-800 dark:text-white font-bold">{quantity}</b></span>
-                <span>•</span>
-                <span>Unit: ₦{unitPriceDisplay.toLocaleString()}</span>
-              </div>
-            </div>
+              );
+            })}
           </div>
 
           {/* TOTAL AGGREGATE PANEL BAR */}
           <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/60 flex justify-between items-center">
-            <span className="text-[10px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">
-              Total aggregate
-            </span>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest">
+                Total aggregate
+              </span>
+              <span className="text-[10px] text-neutral-400 font-medium">Cumulative units: {totalQuantity}</span>
+            </div>
             <p className="text-lg font-black text-amber-500">
               ₦{totalPrice.toLocaleString()}
             </p>

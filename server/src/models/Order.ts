@@ -6,6 +6,7 @@ interface IOrderItem {
   sku?: string;
   unitPrice: number;
   quantity: number;
+  image?: string;
 }
 
 export interface IOrder extends Document {
@@ -70,7 +71,8 @@ const OrderItemSchema = new Schema<IOrderItem>({
     type: Number,
     required: true,
     min: 1
-  }
+  },
+  image: String
 }, { _id: false }); // Disable generation of redundant sub-IDs inside the item array blocks
 
 const OrderSchema = new Schema<IOrder>(
